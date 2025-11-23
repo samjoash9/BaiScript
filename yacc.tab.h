@@ -65,10 +65,11 @@ extern int yydebug;
      LPAREN = 274,
      RPAREN = 275,
      COMMA = 276,
-     IDENTIFIER = 277,
-     INT_LITERAL = 278,
-     CHAR_LITERAL = 279,
-     STRING_LITERAL = 280
+     NEWLINE = 277,
+     IDENTIFIER = 278,
+     INT_LITERAL = 279,
+     CHAR_LITERAL = 280,
+     STRING_LITERAL = 281
    };
 #endif
 
@@ -77,14 +78,14 @@ extern int yydebug;
 typedef union YYSTYPE
 {
 /* Line 2058 of yacc.c  */
-#line 15 "yacc.y"
+#line 17 "yacc.y"
 
     char *str;       /* for token text */
     ASTNode *node;   /* for AST nodes */
 
 
 /* Line 2058 of yacc.c  */
-#line 88 "yacc.tab.h"
+#line 89 "yacc.tab.h"
 } YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */

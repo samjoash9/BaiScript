@@ -263,6 +263,9 @@ static void yy_flex_free YY_PROTO(( void * ));
 
 
 #define YY_USES_REJECT
+
+#define yywrap() 1
+#define YY_SKIP_YYWRAP
 typedef unsigned char YY_CHAR;
 FILE *yyin = (FILE *) 0, *yyout = (FILE *) 0;
 typedef int yy_state_type;
@@ -295,8 +298,8 @@ static yyconst short int yy_acclist[101] =
        32,   19,   31,   32,   17,   31,   32,   25,   31,   32,
        18,   31,   32,   20,   31,   32,   26,   31,   32,   21,
        31,   32,   29,   31,   32,   29,   31,   32,   29,   31,
-       32,   29,   31,   32,   29,   31,   32,    5,   32,    6,
-       32,    5,   32,    1,   28,   14,   15,   11,   16,   12,
+       32,   29,   31,   32,   29,   31,   32,    6,   32,    5,
+       32,    6,   32,    1,   28,   14,   15,   11,   16,   12,
         3,    2,   13,   26,   29,   29,   29,   29,   29,    4,
        27,    2,   29,   29,   29,   29,   29,   29,    7,   29,
        29,   29,   29,   10,   29,    9,   29,   29,    8,   29
@@ -426,15 +429,17 @@ char *yytext;
 #line 1 "lex.l"
 #define INITIAL 0
 #line 2 "lex.l"
-    #include <stdio.h>
-    #include <string.h>
-    #include "ast.h"
-    #include "yacc.tab.h"
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include "ast.h"
+#include "yacc.tab.h"
 
-    extern void yyerror(const char *s);
+extern void yyerror(const char *s);
+extern int lineCount;
 #define COMMENT 1
 
-#line 438 "lex.yy.c"
+#line 443 "lex.yy.c"
 
 /* Macros after this point can all be overridden by user definitions in
  * section 1.
@@ -585,10 +590,10 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
 
-#line 13 "lex.l"
+#line 16 "lex.l"
 
 
-#line 592 "lex.yy.c"
+#line 597 "lex.yy.c"
 
 	if ( yy_init )
 		{
@@ -681,186 +686,169 @@ do_action:	/* This label is used only to access EOF actions. */
 	{ /* beginning of action switch */
 case 1:
 YY_RULE_SETUP
-#line 15 "lex.l"
-;
+#line 18 "lex.l"
+;  // skip whitespace
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 17 "lex.l"
+#line 20 "lex.l"
 { printf("[LEX] COMMENT LINE\n"); }
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 19 "lex.l"
+#line 21 "lex.l"
 { printf("[LEX] COMMENT START\n"); BEGIN(COMMENT); }
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 20 "lex.l"
+#line 22 "lex.l"
 { printf("[LEX] COMMENT END\n"); BEGIN(INITIAL); }
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 21 "lex.l"
-;
+#line 23 "lex.l"
+{ yylineno++; }
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 22 "lex.l"
-;
+#line 24 "lex.l"
+;  // ignore other comment chars
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 24 "lex.l"
+#line 27 "lex.l"
 { printf("[LEX] KUAN\n"); return KUAN; }
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 25 "lex.l"
+#line 28 "lex.l"
 { printf("[LEX] ENTEGER\n"); return ENTEGER; }
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 26 "lex.l"
+#line 29 "lex.l"
 { printf("[LEX] CHAROT\n"); return CHAROT; }
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 27 "lex.l"
+#line 30 "lex.l"
 { printf("[LEX] PRENT\n"); return PRENT; }
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 29 "lex.l"
-{ printf("[LEX] PLUS_EQUAL (+=)\n"); yylval.str = strdup(yytext); return PLUS_EQUAL; }
+#line 33 "lex.l"
+{ yylval.str = strdup(yytext); printf("[LEX] PLUS_EQUAL (+=)\n"); return PLUS_EQUAL; }
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 30 "lex.l"
-{ printf("[LEX] MINUS_EQUAL (-=)\n"); yylval.str = strdup(yytext); return MINUS_EQUAL; }
+#line 34 "lex.l"
+{ yylval.str = strdup(yytext); printf("[LEX] MINUS_EQUAL (-=)\n"); return MINUS_EQUAL; }
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 31 "lex.l"
-{ printf("[LEX] DIV_EQUAL (/=)\n"); yylval.str = strdup(yytext); return DIV_EQUAL; }
+#line 35 "lex.l"
+{ yylval.str = strdup(yytext); printf("[LEX] DIV_EQUAL (/=)\n"); return DIV_EQUAL; }
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 32 "lex.l"
-{ printf("[LEX] MUL_EQUAL (*=)\n"); yylval.str = strdup(yytext); return MUL_EQUAL; }
+#line 36 "lex.l"
+{ yylval.str = strdup(yytext); printf("[LEX] MUL_EQUAL (*=)\n"); return MUL_EQUAL; }
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 34 "lex.l"
-{ printf("[LEX] PLUSPLUS (++)\n"); yylval.str = strdup(yytext); return PLUSPLUS; }
+#line 37 "lex.l"
+{ yylval.str = strdup(yytext); printf("[LEX] PLUSPLUS (++)\n"); return PLUSPLUS; }
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 35 "lex.l"
-{ printf("[LEX] MINUSMINUS (--)\n"); yylval.str = strdup(yytext); return MINUSMINUS; }
+#line 38 "lex.l"
+{ yylval.str = strdup(yytext); printf("[LEX] MINUSMINUS (--)\n"); return MINUSMINUS; }
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 37 "lex.l"
+#line 41 "lex.l"
 { printf("[LEX] PLUS (+)\n"); return PLUS; }
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 38 "lex.l"
+#line 42 "lex.l"
 { printf("[LEX] MINUS (-)\n"); return MINUS; }
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
-#line 39 "lex.l"
+#line 43 "lex.l"
 { printf("[LEX] MUL (*)\n"); return MUL; }
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 40 "lex.l"
+#line 44 "lex.l"
 { printf("[LEX] DIV (/)\n"); return DIV; }
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 41 "lex.l"
-{ printf("[LEX] EQUAL (=)\n"); yylval.str = strdup(yytext); return EQUAL; }
+#line 45 "lex.l"
+{ yylval.str = strdup(yytext); printf("[LEX] EQUAL (=)\n"); return EQUAL; }
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 43 "lex.l"
+#line 46 "lex.l"
 { printf("[LEX] EXCLAM (!)\n"); return EXCLAM; }
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 44 "lex.l"
+#line 47 "lex.l"
 { printf("[LEX] LPAREN\n"); return LPAREN; }
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-#line 45 "lex.l"
+#line 48 "lex.l"
 { printf("[LEX] RPAREN\n"); return RPAREN; }
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
-#line 46 "lex.l"
+#line 49 "lex.l"
 { printf("[LEX] COMMA\n"); return COMMA; }
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
-#line 48 "lex.l"
-{
-    printf("[LEX] INT_LITERAL (%s)\n", yytext);
-    yylval.str = strdup(yytext);
-    return INT_LITERAL;
-}
+#line 52 "lex.l"
+{ yylval.str = strdup(yytext); printf("[LEX] INT_LITERAL (%s)\n", yytext); return INT_LITERAL; }
 	YY_BREAK
 case 27:
 YY_RULE_SETUP
-#line 54 "lex.l"
-{
-    printf("[LEX] CHAR_LITERAL (%s)\n", yytext);
-    yylval.str = strdup(yytext);
-    return CHAR_LITERAL;
-}
+#line 53 "lex.l"
+{ yylval.str = strdup(yytext); printf("[LEX] CHAR_LITERAL (%s)\n", yytext); return CHAR_LITERAL; }
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
-#line 60 "lex.l"
-{
-    printf("[LEX] STRING_LITERAL (%s)\n", yytext);
-    yylval.str = strdup(yytext);
-    return STRING_LITERAL;
-}
+#line 54 "lex.l"
+{ yylval.str = strdup(yytext); printf("[LEX] STRING_LITERAL (%s)\n", yytext); return STRING_LITERAL; }
 	YY_BREAK
 case 29:
 YY_RULE_SETUP
-#line 66 "lex.l"
+#line 57 "lex.l"
 {
-    printf("[LEX] IDENTIFIER (%s)\n", yytext);
     yylval.str = strdup(yytext);
+    printf("[LEX] IDENTIFIER (%s)\n", yytext);
     return IDENTIFIER;
 }
 	YY_BREAK
 case 30:
 YY_RULE_SETUP
-#line 72 "lex.l"
-{
-    printf("[LEX] NEWLINE\n");
-}
+#line 64 "lex.l"
+{ lineCount++; printf("[LEX] NEWLINE\n"); }
 	YY_BREAK
 case 31:
 YY_RULE_SETUP
-#line 76 "lex.l"
-{
-    printf("[LEX] INVALID (%s)\n", yytext);
-    yyerror("Invalid character");
-}
+#line 67 "lex.l"
+{ printf("[LEX] INVALID (%s)\n", yytext); yyerror("Invalid character"); }
 	YY_BREAK
 case 32:
 YY_RULE_SETUP
-#line 81 "lex.l"
+#line 69 "lex.l"
 ECHO;
 	YY_BREAK
-#line 864 "lex.yy.c"
+#line 852 "lex.yy.c"
 			case YY_STATE_EOF(INITIAL):
 			case YY_STATE_EOF(COMMENT):
 				yyterminate();
@@ -1745,7 +1733,6 @@ int main()
 	return 0;
 	}
 #endif
-#line 81 "lex.l"
+#line 69 "lex.l"
 
 
-int yywrap(void) { return 1; }
