@@ -1,0 +1,93 @@
+<program> ::= <statement_list>
+
+
+<statement_list> ::= <statement> <statement_list>
+                   | ε
+
+
+<statement> ::= <declaration> "!"
+               | <assignment> "!"
+               | <simple_expr> "!"
+               | <printing> "!"
+               | "!"
+
+
+<printing> ::= "PRENT" <print_list>
+
+
+<print_list> ::= <print_item> <print_list_prime>
+                | ε
+
+<print_list_prime> ::= "," <print_item> <print_list_prime>
+                      | ε
+
+<print_item> ::= <simple_expr>
+                | <string_literal>
+
+
+<declaration> ::= <datatype> <init_declarator_list>
+
+
+<datatype> ::= "CHAROT"
+              | "ENTEGER"
+              | "KUAN"
+
+
+<init_declarator_list> ::= <init_declarator>
+                          | <init_declarator> "," <init_declarator_list>
+
+
+<init_declarator> ::= <declarator>
+                     | <declarator> "=" <simple_expr>
+
+
+<declarator> ::= <identifier>
+                | "(" <declarator> ")"
+
+
+<assignment> ::= <identifier> <assign_op> <assignment>
+                | <identifier> <assign_op> <simple_expr>
+
+
+<assign_op> ::= "="
+               | "+="
+               | "-="
+               | "/="
+               | "*="
+
+
+<simple_expr> ::= <add_expr>
+
+
+<add_expr> ::= <add_expr> "+" <term>
+              | <add_expr> "-" <term>
+              | <term>
+
+
+<term> ::= <term> "*" <factor>
+          | <term> "/" <factor>
+          | <factor>
+
+
+<factor> ::= <unary>
+            | <postfix>
+
+
+<unary> ::= "+" <factor>
+           | "-" <factor>
+           | "++" <postfix>
+           | "--" <postfix>
+
+
+<postfix> ::= <primary> <postfix_opt>
+
+
+<postfix_opt> ::= "++"
+                 | "--"
+                 | ε
+
+
+<primary> ::= <identifier>
+             | <int_literal>
+             | <char_literal>
+             | "(" <simple_expr> ")"
