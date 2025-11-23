@@ -30,14 +30,41 @@ static void indent(int level)
     for (int i = 0; i < level; i++) printf("  ");
 }
 
-void print_ast(ASTNode *node, int level)
+// Pretty print AST with type names
+void print_ast(ASTNode *node, int indent)
 {
     if (!node) return;
 
-    indent(level);
-    const char *val = node->value ? node->value : "NULL";
-    printf("Node(type=%d, value=%s, line=%d)\n", node->type, val, node->line);
+    // Print indentation
+    for (int i = 0; i < indent; i++) printf("  ");
 
-    print_ast(node->left, level + 1);
-    print_ast(node->right, level + 1);
+    // Print node value and type
+    printf("(%s: ", node->value ? node->value : "NULL");
+
+    switch (node->type) {
+        case NODE_START:          printf("START"); break;
+        case NODE_STATEMENT_LIST: printf("STATEMENT_LIST"); break;
+        case NODE_STATEMENT:      printf("STATEMENT"); break;
+        case NODE_PRINTING:       printf("PRINTING"); break;
+        case NODE_PRINT_ITEM:     printf("PRINT_ITEM"); break;
+        case NODE_DECLARATION:    printf("DECL"); break;
+        case NODE_DATATYPE:       printf("DATATYPE"); break;
+        case NODE_IDENTIFIER:     printf("IDENTIFIER"); break;
+        case NODE_LITERAL:        printf("LITERAL"); break;
+        case NODE_ASSIGNMENT:     printf("ASSIGNMENT"); break;
+        case NODE_UNKNOWN:        printf("UNKNOWN"); break;
+        case NODE_EXPRESSION:     printf("EXPRESSION"); break;
+        case NODE_TERM:           printf("TERM"); break;
+        case NODE_UNARY_OP:       printf("UNARY_OP"); break;
+        case NODE_POSTFIX_OP:     printf("POSTFIX_OP"); break;
+        case NODE_FACTOR:         printf("FACTOR"); break;
+        default:                  printf("OTHER"); break;
+    }
+
+    printf(")\n");
+
+    // Recursively print children
+    print_ast(node->left, indent + 1);
+    print_ast(node->right, indent + 1);
 }
+

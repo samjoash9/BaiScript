@@ -1,3 +1,9 @@
-KUAN a = '1'!
+// Variable declarations without initialization
+ENTEGER x!  
+CHAROT c!  
 
-PRENT a!
+x = 1!
+c = 'a'!
+
+c = x + c!
+c += x!

@@ -23,13 +23,13 @@ int lineCount = 1;
 %token KUAN ENTEGER CHAROT
 %token PRENT
 %token EXCLAM
-%token PLUS_EQUAL MINUS_EQUAL DIV_EQUAL MUL_EQUAL EQUAL
 %token PLUS MINUS MUL DIV
 %token PLUSPLUS MINUSMINUS
 %token LPAREN RPAREN COMMA
 %token NEWLINE
 
 %token <str> IDENTIFIER INT_LITERAL CHAR_LITERAL STRING_LITERAL
+%token <str> PLUS_EQUAL MINUS_EQUAL MUL_EQUAL DIV_EQUAL EQUAL
 
 /* Nonterminals that produce AST nodes */
 %type <node> S STATEMENT_LIST STATEMENT
@@ -65,8 +65,8 @@ STATEMENT:
     | SIMPLE_EXPR EXCLAM       { $$ = new_node(NODE_STATEMENT, "EXPR_STMT", $1, NULL, lineCount); }
     | PRINTING EXCLAM          { $$ = new_node(NODE_STATEMENT, "PRINT_STMT", $1, NULL, lineCount); }
     | EXCLAM                   { $$ = new_node(NODE_STATEMENT, "EMPTY!", NULL, NULL, lineCount); }
-    | error NEWLINE            { yyerror("Invalid statement"); yyerrok; ++lineCount; }  /* Increment lineCount on error */
-    | NEWLINE                  { ++lineCount; }  /* Increment lineCount for real newline */
+    | error NEWLINE            { yyerror("Invalid statement"); yyerrok; ++lineCount; }
+    | NEWLINE                  { ++lineCount; }
 ;
 
 /* Printing */
@@ -135,24 +135,24 @@ ASSIGNMENT:
       IDENTIFIER ASSIGN_OP ASSIGNMENT
       {
           ASTNode *id = new_node(NODE_IDENTIFIER, $1, NULL, NULL, lineCount);
-          $$ = new_node(NODE_ASSIGNMENT, $2 ? $2->value : "ASSIGN", id, $3, lineCount);
-          if ($2) { free($2->value); free($2); }
+          $$ = new_node(NODE_ASSIGNMENT, $2->value, id, $3, lineCount);
+          free($2->value); free($2);
       }
     | IDENTIFIER ASSIGN_OP SIMPLE_EXPR
       {
           ASTNode *id = new_node(NODE_IDENTIFIER, $1, NULL, NULL, lineCount);
-          $$ = new_node(NODE_ASSIGNMENT, $2 ? $2->value : "ASSIGN", id, $3, lineCount);
-          if ($2) { free($2->value); free($2); }
+          $$ = new_node(NODE_ASSIGNMENT, $2->value, id, $3, lineCount);
+          free($2->value); free($2);
       }
 ;
 
-/* ASSIGN_OP returns a small node carrying the operator text */
+/* ASSIGN_OP returns a node carrying the operator text */
 ASSIGN_OP:
-      EQUAL        { $$ = new_node(NODE_UNKNOWN, "=", NULL, NULL, lineCount); }
-    | PLUS_EQUAL   { $$ = new_node(NODE_UNKNOWN, "+=", NULL, NULL, lineCount); }
-    | MINUS_EQUAL  { $$ = new_node(NODE_UNKNOWN, "-=", NULL, NULL, lineCount); }
-    | DIV_EQUAL    { $$ = new_node(NODE_UNKNOWN, "/=", NULL, NULL, lineCount); }
-    | MUL_EQUAL    { $$ = new_node(NODE_UNKNOWN, "*=", NULL, NULL, lineCount); }
+      EQUAL        { $$ = new_node(NODE_UNKNOWN, $1, NULL, NULL, lineCount); }
+    | PLUS_EQUAL   { $$ = new_node(NODE_UNKNOWN, $1, NULL, NULL, lineCount); }
+    | MINUS_EQUAL  { $$ = new_node(NODE_UNKNOWN, $1, NULL, NULL, lineCount); }
+    | DIV_EQUAL    { $$ = new_node(NODE_UNKNOWN, $1, NULL, NULL, lineCount); }
+    | MUL_EQUAL    { $$ = new_node(NODE_UNKNOWN, $1, NULL, NULL, lineCount); }
 ;
 
 /* Expressions */
@@ -173,8 +173,8 @@ TERM:
 ;
 
 FACTOR:
-      UNARY      { $$ = new_node(NODE_FACTOR, NULL, $1, NULL, lineCount); }
-    | POSTFIX    { $$ = new_node(NODE_FACTOR, NULL, $1, NULL, lineCount); }
+      UNARY      
+    | POSTFIX    
 ;
 
 UNARY:

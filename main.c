@@ -4,6 +4,9 @@
 #include "ast.h"      // MUST BE FIRST
 #include "yacc.tab.h" // MUST BE AFTER ast.h
 #include "semantic_analyzer.h"  
+#include "intermediate_code_generator.h"
+#include "target_code_generator.h"
+#include "machine_code_generator.h"
 #include "symbol_table.h"
 
 extern int yyparse(void);
@@ -62,6 +65,33 @@ int main()
     }
     printf("\n=== BAI SCRIPT SEMANTIC ANALYSIS ENDED ===\n\n");
     
+    
+    // === STEP 3: PRINT INTERMEDIATE CODE GENERATOR ===
+    printf("\n=== BAI SCRIPT INTERMEDIATE CODE GENERATION ===\n\n");
+    if (result == 0 && !parse_failed)
+    {
+        generate_intermediate_code(root);
+    }
+    printf("\n=== BAI SCRIPT INTERMEDIATE CODE GENERATION ENDED ===\n\n");
+
+
+    // === STEP 4: TARGET CODE GENERATION ===
+    printf("\n=== BAI SCRIPT TARGET CODE GENERATION ===\n\n");
+    if (result == 0 && !parse_failed)
+    {
+        generate_target_code();
+    }
+    printf("\n=== BAI SCRIPT TARGET CODE GENERATION ENDED ===\n\n");
+
+
+    // === STEP 5: MACHINE CODE GENERATION ===
+    printf("\n=== BAI SCRIPT MACHINE CODE GENERATION ===\n\n");
+    if (result == 0 && !parse_failed)
+    {
+        generate_machine_code();
+    }
+    printf("\n=== BAI SCRIPT MACHINE CODE GENERATION ENDED ===\n\n");
+
     printf("\n=== BAI SCRIPT SYMBOL TABLE ===\n\n");
     print_symbol_table();
     fclose(yyin);

@@ -67,7 +67,7 @@ void clear_symbol_table(void)
 /* Print symbol table */
 void print_symbol_table(void)
 {
-    printf("=== SYMBOL TABLE (%zu entries) ===\n", symbol_count);
+    printf("============ SYMBOL TABLE (%zu entries) ============\n", symbol_count);
     printf("%-10s | %-10s | %-10s | %-10s\n", "Name", "Datatype", "Initialized", "Value");
     printf("---------------------------------------------\n");
     for (size_t i = 0; i < symbol_count; i++)
@@ -78,5 +78,5 @@ void print_symbol_table(void)
             symbol_table[i].initialized ? "Yes" : "No",
             symbol_table[i].value_str);
     }
-    printf("=================================\n");
+    printf("===================================================\n");
 }

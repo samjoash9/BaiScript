@@ -1,0 +1,32 @@
+.data
+x: .word64 0
+c: .word64 0
+
+.code
+; x = 0
+daddiu r1, r0, 0
+sd r1, x(r0)
+
+; c = 0
+daddiu r1, r0, 0
+sd r1, c(r0)
+
+; x = 1
+daddiu r1, r0, 1
+sd r1, x(r0)
+
+; c = 'a'
+daddiu r1, r0, 97
+sd r1, c(r0)
+
+; c = x + c
+ld r1, x(r0)
+daddiu r2, r0, 48
+daddu r3, r1, r2
+sd r3, c(r0)
+
+; c = c + x
+daddiu r1, r0, 48
+ld r2, x(r0)
+daddu r3, r1, r2
+sd r3, c(r0)
