@@ -1,294 +1,320 @@
-    // intermediate_code_generator.c
-    #include <stdio.h>
-    #include <stdlib.h>
-    #include <string.h>
-    #include <ctype.h>
+// intermediate_code_generator.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
 
-    #include "intermediate_code_generator.h"
+#include "intermediate_code_generator.h"
 
-    static TACInstruction *code = NULL;
-    TACInstruction *optimizedCode = NULL;
-    static int codeCount = 0;
-    int optimizedCount = 0;
-    static int tempCount = 0;
+static TACInstruction *code = NULL;
+TACInstruction *optimizedCode = NULL;
+static int codeCount = 0;
+int optimizedCount = 0;
+static int tempCount = 0;
 
-    // === Utility ===
-    TACInstruction *getOptimizedCode(int *count)
+// === Utility ===
+TACInstruction *getOptimizedCode(int *count)
+{
+    if (count)
+        *count = optimizedCount;
+    return optimizedCode;
+}
+
+static char *newTemp()
+{
+    char buf[32];
+    snprintf(buf, sizeof(buf), "temp%d", tempCount++);
+    return strdup(buf);
+}
+
+static void emit(const char *result, const char *arg1, const char *op, const char *arg2)
+{
+    TACInstruction *tmp = realloc(code, sizeof(TACInstruction) * (codeCount + 1));
+    if (!tmp)
     {
-        if (count)
-            *count = optimizedCount;
-        return optimizedCode;
+        fprintf(stderr, "Memory allocation failed in emit()\n");
+        exit(1);
+    }
+    code = tmp;
+
+    snprintf(code[codeCount].result, sizeof(code[codeCount].result), "%s", result ? result : "");
+    snprintf(code[codeCount].arg1, sizeof(code[codeCount].arg1), "%s", arg1 ? arg1 : "");
+    snprintf(code[codeCount].op, sizeof(code[codeCount].op), "%s", op ? op : "");
+    snprintf(code[codeCount].arg2, sizeof(code[codeCount].arg2), "%s", arg2 ? arg2 : "");
+    codeCount++;
+}
+
+// === Expression Generator ===
+static char *generateExpression(ASTNode *node)
+{
+    if (!node)
+        return NULL;
+
+    // Leaf node (identifier or literal)
+    if (node->left == NULL && node->right == NULL)
+        return strdup(node->value ? node->value : "");
+
+    // Assignment (simple or compound)
+    if (node->type == NODE_ASSIGNMENT && node->left && node->right)
+    {
+        char *lhs = node->left->value;
+
+        // Simple assignment
+        if (strcmp(node->value, "=") == 0)
+        {
+            char *rhs = generateExpression(node->right);
+            emit(lhs, rhs, "=", NULL);
+            free(rhs);
+            return strdup(lhs);
+        }
+        // Compound assignment (+=, -=, *=, /=)
+        else if (strcmp(node->value, "+=") == 0 ||
+                strcmp(node->value, "-=") == 0 ||
+                strcmp(node->value, "*=") == 0 ||
+                strcmp(node->value, "/=") == 0)
+        {
+            char op[2] = {node->value[0], '\0'}; // "+=" -> '+'
+            char *rhs = generateExpression(node->right);
+            emit(lhs, lhs, op, rhs); // x = x op rhs
+            free(rhs);
+            return strdup(lhs);
+        }
     }
 
-    static char *newTemp()
+    // Postfix operations (++ / --)
+    if (node->type == NODE_POSTFIX_OP && node->left)
     {
-        char buf[32];
-        snprintf(buf, sizeof(buf), "temp%d", tempCount++);
-        return strdup(buf);
+        char *var = generateExpression(node->left); // get current value
+        char *tmp = newTemp();                      // temp for expression
+
+        if (strcmp(node->value, "++") == 0)
+        {
+            emit(tmp, var, "=", NULL); // tmp = current value
+            emit(var, var, "+", "1");  // increment after
+        }
+        else if (strcmp(node->value, "--") == 0)
+        {
+            emit(tmp, var, "=", NULL); // tmp = current value
+            emit(var, var, "-", "1");  // decrement after
+        }
+
+        free(var);
+        return tmp; // use original value in expression
     }
 
-    static void emit(const char *result, const char *arg1, const char *op, const char *arg2)
+    // Unary operators (++ / -- / + / -)
+    if (node->type == NODE_UNARY_OP && node->left)
     {
-        TACInstruction *tmp = realloc(code, sizeof(TACInstruction) * (codeCount + 1));
-        if (!tmp)
+        char *lhs = generateExpression(node->left);
+        if (strcmp(node->value, "++") == 0)
         {
-            fprintf(stderr, "Memory allocation failed in emit()\n");
-            exit(1);
+            emit(lhs, lhs, "+", "1");
+            return lhs;
         }
-        code = tmp;
-
-        snprintf(code[codeCount].result, sizeof(code[codeCount].result), "%s", result ? result : "");
-        snprintf(code[codeCount].arg1, sizeof(code[codeCount].arg1), "%s", arg1 ? arg1 : "");
-        snprintf(code[codeCount].op, sizeof(code[codeCount].op), "%s", op ? op : "");
-        snprintf(code[codeCount].arg2, sizeof(code[codeCount].arg2), "%s", arg2 ? arg2 : "");
-        codeCount++;
-    }
-
-    // === Expression Generator ===
-    static char *generateExpression(ASTNode *node)
-    {
-        if (!node)
-            return NULL;
-
-        // Leaf node (identifier or literal)
-        if (node->left == NULL && node->right == NULL)
-            return strdup(node->value ? node->value : "");
-
-        // Assignment (simple or compound)
-        if (node->type == NODE_ASSIGNMENT && node->left && node->right)
+        else if (strcmp(node->value, "--") == 0)
         {
-            char *lhs = node->left->value;
-
-            // Simple assignment
-            if (strcmp(node->value, "=") == 0)
-            {
-                char *rhs = generateExpression(node->right);
-                emit(lhs, rhs, "=", NULL);
-                free(rhs);
-                return strdup(lhs);
-            }
-            // Compound assignment (+=, -=, *=, /=)
-            else if (strcmp(node->value, "+=") == 0 ||
-                    strcmp(node->value, "-=") == 0 ||
-                    strcmp(node->value, "*=") == 0 ||
-                    strcmp(node->value, "/=") == 0)
-            {
-                char op[2] = {node->value[0], '\0'}; // "+=" -> '+'
-                char *rhs = generateExpression(node->right);
-                emit(lhs, lhs, op, rhs); // x = x op rhs
-                free(rhs);
-                return strdup(lhs);
-            }
+            emit(lhs, lhs, "-", "1");
+            return lhs;
         }
-
-        // Postfix operations (++ / --)
-        if (node->type == NODE_POSTFIX_OP && node->left)
+        else if (strcmp(node->value, "-") == 0)
         {
-            char *var = generateExpression(node->left); // get current value
-            char *tmp = newTemp();                      // temp for expression
-
-            if (strcmp(node->value, "++") == 0)
-            {
-                emit(tmp, var, "=", NULL); // tmp = current value
-                emit(var, var, "+", "1");  // increment after
-            }
-            else if (strcmp(node->value, "--") == 0)
-            {
-                emit(tmp, var, "=", NULL); // tmp = current value
-                emit(var, var, "-", "1");  // decrement after
-            }
-
-            free(var);
-            return tmp; // use original value in expression
-        }
-
-        // Unary operators (++ / -- / + / -)
-        if (node->type == NODE_UNARY_OP && node->left)
-        {
-            char *lhs = generateExpression(node->left);
-            if (strcmp(node->value, "++") == 0)
-            {
-                emit(lhs, lhs, "+", "1");
-                return lhs;
-            }
-            else if (strcmp(node->value, "--") == 0)
-            {
-                emit(lhs, lhs, "-", "1");
-                return lhs;
-            }
-            else if (strcmp(node->value, "-") == 0)
-            {
-                char *tmp = newTemp();
-                emit(tmp, "0", "-", lhs);
-                free(lhs);
-                return tmp;
-            }
-            else if (strcmp(node->value, "+") == 0)
-            {
-                return lhs;
-            }
-        }
-
-        // Binary operations (+, -, *, /)
-        if (node->left && node->right)
-        {
-            char *left = generateExpression(node->left);
-            char *right = generateExpression(node->right);
             char *tmp = newTemp();
-            emit(tmp, left, node->value, right);
-            free(left);
-            free(right);
+            emit(tmp, "0", "-", lhs);
+            free(lhs);
             return tmp;
         }
-
-        // fallback
-        return strdup(node->value ? node->value : "");
+        else if (strcmp(node->value, "+") == 0)
+        {
+            return lhs;
+        }
     }
 
-    // === Code Generator ===
-    static void generateCode(ASTNode *node)
+    // Binary operations (+, -, *, /)
+    if (node->left && node->right)
     {
-        if (!node)
-            return;
+        char *left = generateExpression(node->left);
+        char *right = generateExpression(node->right);
+        char *tmp = newTemp();
+        emit(tmp, left, node->value, right);
+        free(left);
+        free(right);
+        return tmp;
+    }
 
-        switch (node->type)
+    // fallback
+    return strdup(node->value ? node->value : "");
+}
+
+// === Code Generator ===
+static void generateCode(ASTNode *node)
+{
+    if (!node)
+        return;
+
+    switch (node->type)
+    {
+    case NODE_START:
+        generateCode(node->left);
+        break;
+
+    case NODE_STATEMENT_LIST:
+        generateCode(node->left);
+        generateCode(node->right);
+        break;
+
+    case NODE_STATEMENT:
+        generateCode(node->left);
+        break;
+
+    case NODE_DECLARATION:
+    {
+        ASTNode *cur = node->left;
+        while (cur)
         {
-        case NODE_START:
-            generateCode(node->left);
-            break;
-
-        case NODE_STATEMENT_LIST:
-            generateCode(node->left);
-            generateCode(node->right);
-            break;
-
-        case NODE_STATEMENT:
-            generateCode(node->left);
-            break;
-
-        case NODE_DECLARATION:
-        {
-            ASTNode *cur = node->left;
-            while (cur)
+            // If this is an INIT_DECL node
+            if (cur->type == NODE_DECLARATION && strcmp(cur->value, "INIT_DECL") == 0)
             {
-                // If this is an INIT_DECL node
-                if (cur->type == NODE_DECLARATION && strcmp(cur->value, "INIT_DECL") == 0)
+                char *id = cur->left->value;          // identifier
+                char *rhs = generateExpression(cur->right); // initializer
+                if (id && rhs)
                 {
-                    char *id = cur->left->value;          // identifier
-                    char *rhs = generateExpression(cur->right); // initializer
-                    if (id && rhs)
-                    {
-                        emit(id, rhs, "=", NULL);
-                        free(rhs);
-                    }
+                    emit(id, rhs, "=", NULL);
+                    free(rhs);
                 }
-                else if (cur->type == NODE_IDENTIFIER)
-                {
-                    // simple declaration without initialization
-                    char *id = cur->value;
-                    if (id)
-                        emit(id, "0", "=", NULL); // default initialize to 0
-                }
-                cur = cur->right;
             }
-            break;
-        }
-
-        case NODE_ASSIGNMENT:
-        case NODE_EXPRESSION:
-        case NODE_POSTFIX_OP:
-        case NODE_UNARY_OP:
-        {
-            char *res = generateExpression(node);
-            if (res)
-                free(res);
-            break;
-        }
-
-        default:
-            break;
-        }
-    }
-
-
-    // === Optimization: remove redundant temporaries ===
-    static void removeRedundantTemporaries()
-    {
-        if (codeCount == 0)
-            return;
-
-        optimizedCode = malloc(sizeof(TACInstruction) * codeCount);
-        memcpy(optimizedCode, code, sizeof(TACInstruction) * codeCount);
-        optimizedCount = codeCount;
-
-        for (int i = 0; i < optimizedCount - 1; i++)
-        {
-            TACInstruction *cur = &optimizedCode[i];
-            TACInstruction *next = &optimizedCode[i + 1];
-
-            if (cur->result[0] == 't' && strcmp(next->arg1, cur->result) == 0 && strcmp(next->op, "=") == 0)
+            else if (cur->type == NODE_IDENTIFIER)
             {
-                snprintf(next->arg1, sizeof(next->arg1), "%s", cur->arg1);
-                snprintf(next->op, sizeof(next->op), "%s", cur->op);
-                snprintf(next->arg2, sizeof(next->arg2), "%s", cur->arg2);
-                cur->result[0] = '\0';
+                // simple declaration without initialization
+                char *id = cur->value;
+                if (id)
+                    emit(id, "0", "=", NULL); // default initialize to 0
             }
+            cur = cur->right;
         }
-
-        int j = 0;
-        for (int i = 0; i < optimizedCount; i++)
-            if (strlen(optimizedCode[i].result) > 0)
-                optimizedCode[j++] = optimizedCode[i];
-
-        optimizedCount = j;
+        break;
     }
 
-    // === Display ===
-    static void displayTAC()
+    case NODE_ASSIGNMENT:
+    case NODE_EXPRESSION:
+    case NODE_POSTFIX_OP:
+    case NODE_UNARY_OP:
     {
-        printf("    ===== INTERMEDIATE CODE (TAC) =====\n");
-        for (int i = 0; i < codeCount; i++)
+        char *res = generateExpression(node);
+        if (res)
+            free(res);
+        break;
+    }
+
+    default:
+        break;
+    }
+}
+
+
+// === Optimization: remove redundant temporaries ===
+static void removeRedundantTemporaries()
+{
+    if (codeCount == 0)
+        return;
+
+    optimizedCode = malloc(sizeof(TACInstruction) * codeCount);
+    memcpy(optimizedCode, code, sizeof(TACInstruction) * codeCount);
+    optimizedCount = codeCount;
+
+    for (int i = 0; i < optimizedCount - 1; i++)
+    {
+        TACInstruction *cur = &optimizedCode[i];
+        TACInstruction *next = &optimizedCode[i + 1];
+
+        if (cur->result[0] == 't' && strcmp(next->arg1, cur->result) == 0 && strcmp(next->op, "=") == 0)
         {
-            TACInstruction *inst = &code[i];
-            if (strcmp(inst->op, "=") == 0 && strlen(inst->arg2) == 0)
-                printf("    %s = %s\n", inst->result, inst->arg1);
-            else
-                printf("    %s = %s %s %s\n", inst->result, inst->arg1, inst->op, inst->arg2);
+            snprintf(next->arg1, sizeof(next->arg1), "%s", cur->arg1);
+            snprintf(next->op, sizeof(next->op), "%s", cur->op);
+            snprintf(next->arg2, sizeof(next->arg2), "%s", cur->arg2);
+            cur->result[0] = '\0';
         }
-        printf("    ===== INTERMEDIATE CODE (TAC) END =====\n\n");
     }
 
-    static void displayOptimizedTAC()
+    int j = 0;
+    for (int i = 0; i < optimizedCount; i++)
+        if (strlen(optimizedCode[i].result) > 0)
+            optimizedCode[j++] = optimizedCode[i];
+
+    optimizedCount = j;
+}
+
+
+
+// === Display ===
+static void displayTAC()
+{
+    printf("    ===== INTERMEDIATE CODE (TAC) =====\n");
+    for (int i = 0; i < codeCount; i++)
     {
-        printf("    ===== OPTIMIZED CODE =====\n");
-        for (int i = 0; i < optimizedCount; i++)
-        {
-            TACInstruction *inst = &optimizedCode[i];
-            if (strcmp(inst->op, "=") == 0 && strlen(inst->arg2) == 0)
-                printf("    %s = %s\n", inst->result, inst->arg1);
-            else
-                printf("    %s = %s %s %s\n", inst->result, inst->arg1, inst->op, inst->arg2);
-        }
-        printf("    ===== OPTIMIZED CODE END =====\n");
+        TACInstruction *inst = &code[i];
+        if (strcmp(inst->op, "=") == 0 && strlen(inst->arg2) == 0)
+            printf("    %s = %s\n", inst->result, inst->arg1);
+        else
+            printf("    %s = %s %s %s\n", inst->result, inst->arg1, inst->op, inst->arg2);
     }
+    printf("    ===== INTERMEDIATE CODE (TAC) END =====\n\n");
+}
 
-    // === Public Interface ===
-    void generate_intermediate_code(ASTNode *root)
+static void displayOptimizedTAC()
+{
+
+    printf("    ===== OPTIMIZED CODE =====\n");
+    for (int i = 0; i < optimizedCount; i++)
     {
-        if (code)
-            free(code);
-        if (optimizedCode)
-            free(optimizedCode);
-        code = NULL;
-        optimizedCode = NULL;
-        codeCount = 0;
-        optimizedCount = 0;
-        tempCount = 0;
-
-        if (root)
-            generateCode(root);
-
-        displayTAC();
-        removeRedundantTemporaries();
-        displayOptimizedTAC();
+        TACInstruction *inst = &optimizedCode[i];
+        if (strcmp(inst->op, "=") == 0 && strlen(inst->arg2) == 0)
+            printf("    %s = %s\n", inst->result, inst->arg1);
+        else
+            printf("    %s = %s %s %s\n", inst->result, inst->arg1, inst->op, inst->arg2);
     }
+    printf("    ===== OPTIMIZED CODE END =====\n");
+}
+
+void output_tac_file()
+{
+    FILE *f = fopen("output_tac.txt", "w");
+    if (!f)
+    {
+        printf("ERROR: Cannot write TAC output file!\n");
+        return;
+    }
+
+    for (int i = 0; i < optimizedCount; i++)
+    {
+        TACInstruction *inst = &optimizedCode[i];
+        if (strcmp(inst->op, "=") == 0 && strlen(inst->arg2) == 0)
+            fprintf(f, "%s = %s\n", inst->result, inst->arg1);
+        else
+            fprintf(f, "%s = %s %s %s\n", inst->result, inst->arg1, inst->op, inst->arg2);
+    }
+
+    fclose(f);
+}
+
+// === Public Interface ===
+void generate_intermediate_code(ASTNode *root)
+{
+    if (code)
+        free(code);
+    if (optimizedCode)
+        free(optimizedCode);
+    code = NULL;
+    optimizedCode = NULL;
+    codeCount = 0;
+    optimizedCount = 0;
+    tempCount = 0;
+
+    if (root)
+        generateCode(root);
+
+    displayTAC();
+    removeRedundantTemporaries();
+    displayOptimizedTAC();
+    output_tac_file();
+}
+

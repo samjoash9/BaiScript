@@ -273,14 +273,29 @@ static SEM_TEMP eval_term(ASTNode *node)
     if (L.is_constant && R.is_constant && op)
     {
         long val = 0;
-        if (strcmp(op, "*") == 0) val = L.int_value * R.int_value;
-        else if (strcmp(op, "/") == 0) val = R.int_value ? L.int_value / R.int_value : 0;
+        if (strcmp(op, "*") == 0)
+        {
+            val = L.int_value * R.int_value;
+        }
+        else if (strcmp(op, "/") == 0)
+        {
+            if (R.int_value == 0)
+            {
+                sem_record_error(node, "Division by zero");
+                val = 0; // fallback
+            }
+            else
+            {
+                val = L.int_value / R.int_value;
+            }
+        }
         SEM_TEMP t = sem_new_temp(SEM_TYPE_INT);
         t.is_constant = 1;
         t.int_value = val;
         t.node = node;
         return t;
     }
+
 
     SEM_TEMP res = sem_new_temp(SEM_TYPE_INT);
     res.node = node;
@@ -378,6 +393,9 @@ static void handle_declaration(ASTNode *decl_node)
                 if (idx != -1)
                 {
                     symbol_table[idx].initialized = 1;
+                    if (dtype == SEM_TYPE_CHAR)
+                        symbol_table[idx].value_str[0] = '\0';
+                    else
                     snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", kv->temp.int_value);
                 }
             }

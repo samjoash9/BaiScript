@@ -1,9 +1,17 @@
-// Variable declarations without initialization
-ENTEGER x!  
-CHAROT c!  
+ENTEGER a = 1!
+a += 10!
+a = a - 'A'!
+CHAROT b!
+CHAROT c!
+CHAROT d!
 
-x = 1!
-c = 'a'!
 
-c = x + c!
-c += x!
+PRENT a, " hehe ", " + ", 67!
+
+a = a + 12!
+PRENT a, " hehe ", " + ", 67!
+
+PRENT 1/0!
+PRENT b, " hehe ", " + ", 67!
+PRENT c + 1, " hehe ", " + ", 67!
+PRENT d, " hehe ", " + ", 67!

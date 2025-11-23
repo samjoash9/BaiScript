@@ -67,7 +67,15 @@ void clear_symbol_table(void)
 /* Print symbol table */
 void print_symbol_table(void)
 {
-    printf("============ SYMBOL TABLE (%zu entries) ============\n", symbol_count);
+
+    char *name = "entries";
+
+    if (symbol_count == 1)
+    {
+        name = "entry";
+    }
+
+    printf("============ SYMBOL TABLE (%zu %s) ============\n", symbol_count, name);
     printf("%-10s | %-10s | %-10s | %-10s\n", "Name", "Datatype", "Initialized", "Value");
     printf("---------------------------------------------\n");
     for (size_t i = 0; i < symbol_count; i++)

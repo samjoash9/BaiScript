@@ -1,32 +1,40 @@
 .data
-x: .word64 0
+a: .word64 0
+b: .word64 0
 c: .word64 0
+d: .word64 0
 
 .code
-; x = 0
+; a = 1
+daddiu r1, r0, 1
+sd r1, a(r0)
+
+; a = a + 10
+ld r1, a(r0)
+daddiu r2, r0, 10
+daddu r3, r1, r2
+sd r3, a(r0)
+
+; a = a - 'A'
+ld r1, a(r0)
+daddiu r2, r0, 65
+dsub r3, r1, r2
+sd r3, a(r0)
+
+; b = 0
 daddiu r1, r0, 0
-sd r1, x(r0)
+sd r1, b(r0)
 
 ; c = 0
 daddiu r1, r0, 0
 sd r1, c(r0)
 
-; x = 1
-daddiu r1, r0, 1
-sd r1, x(r0)
+; d = 0
+daddiu r1, r0, 0
+sd r1, d(r0)
 
-; c = 'a'
-daddiu r1, r0, 97
-sd r1, c(r0)
-
-; c = x + c
-ld r1, x(r0)
-daddiu r2, r0, 48
+; a = a + 12
+ld r1, a(r0)
+daddiu r2, r0, 12
 daddu r3, r1, r2
-sd r3, c(r0)
-
-; c = c + x
-daddiu r1, r0, 48
-ld r2, x(r0)
-daddu r3, r1, r2
-sd r3, c(r0)
+sd r3, a(r0)
