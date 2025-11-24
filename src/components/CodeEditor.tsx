@@ -56,48 +56,42 @@ export function CodeEditor({
   return (
     <div className={`flex flex-col rounded-xl border ${getBorderColor()} bg-gradient-to-br ${getAccentColor()} backdrop-blur-sm overflow-hidden transition-colors`}>
       {/* Header */}
-      <div className={`flex items-center justify-between px-4 py-3 border-b transition-colors ${
-        isDark
-          ? 'border-gray-800/50 bg-black/30'
-          : 'border-gray-200/50 bg-white/50'
-      }`}>
+      <div className={`flex items-center justify-between px-4 py-3 border-b transition-colors ${isDark
+        ? 'border-gray-800/50 bg-black/30'
+        : 'border-gray-200/50 bg-white/50'
+        }`}>
         <div className="flex items-center gap-2">
           {getIcon()}
           <div>
             <h3 className="text-sm">{title}</h3>
-            <p className={`text-xs transition-colors ${
-              isDark
-                ? 'text-gray-400'
-                : 'text-gray-600'
-            }`}>
+            <p className={`text-xs transition-colors ${isDark
+              ? 'text-gray-400'
+              : 'text-gray-600'
+              }`}>
               {subtitle}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`text-xs transition-colors ${
-            isDark
-              ? 'text-gray-500'
-              : 'text-gray-600'
-          }`}>
+          <span className={`text-xs transition-colors ${isDark
+            ? 'text-gray-500'
+            : 'text-gray-600'
+            }`}>
             {language}
           </span>
           <div className="flex gap-1.5">
-            <div className={`w-3 h-3 rounded-full transition-colors ${
-              isDark
-                ? 'bg-gray-600/50'
-                : 'bg-gray-400/50'
-            }`}></div>
-            <div className={`w-3 h-3 rounded-full transition-colors ${
-              isDark
-                ? 'bg-gray-600/50'
-                : 'bg-gray-400/50'
-            }`}></div>
-            <div className={`w-3 h-3 rounded-full transition-colors ${
-              isDark
-                ? 'bg-gray-600/50'
-                : 'bg-gray-400/50'
-            }`}></div>
+            <div className={`w-3 h-3 rounded-full transition-colors ${isDark
+              ? 'bg-gray-600/50'
+              : 'bg-gray-400/50'
+              }`}></div>
+            <div className={`w-3 h-3 rounded-full transition-colors ${isDark
+              ? 'bg-gray-600/50'
+              : 'bg-gray-400/50'
+              }`}></div>
+            <div className={`w-3 h-3 rounded-full transition-colors ${isDark
+              ? 'bg-gray-600/50'
+              : 'bg-gray-400/50'
+              }`}></div>
           </div>
         </div>
       </div>
@@ -110,43 +104,38 @@ export function CodeEditor({
           readOnly={readOnly}
           placeholder={placeholder}
           spellCheck={false}
-          className={`w-full h-full p-4 bg-transparent text-sm font-mono resize-none focus:outline-none transition-colors ${
-            isDark
-              ? 'text-gray-100 placeholder:text-gray-600'
-              : 'text-gray-900 placeholder:text-gray-500'
-          }`}
+          className={`w-full h-full p-4 bg-transparent text-sm font-mono resize-none focus:outline-none transition-colors ${isDark
+            ? 'text-gray-100 placeholder:text-gray-600'
+            : 'text-gray-900 placeholder:text-gray-500'
+            }`}
           style={{
             lineHeight: '1.6',
             tabSize: 2
           }}
         />
-        
+
         {/* Line numbers overlay effect */}
-        <div className={`absolute top-0 left-0 w-12 h-full bg-gradient-to-r transition-colors pointer-events-none ${
-          isDark
-            ? 'from-black/20 to-transparent'
-            : 'from-white/40 to-transparent'
-        }`}></div>
+        <div className={`absolute top-0 left-0 w-12 h-full bg-gradient-to-r transition-colors pointer-events-none ${isDark
+          ? 'from-black/20 to-transparent'
+          : 'from-white/40 to-transparent'
+          }`}></div>
       </div>
 
       {/* Footer */}
-      <div className={`flex items-center justify-between px-4 py-2 border-t transition-colors ${
-        isDark
-          ? 'border-gray-800/50 bg-black/30'
-          : 'border-gray-200/50 bg-white/50'
-      }`}>
-        <span className={`text-xs transition-colors ${
-          isDark
-            ? 'text-gray-500'
-            : 'text-gray-600'
+      <div className={`flex items-center justify-between px-4 py-2 border-t transition-colors ${isDark
+        ? 'border-gray-800/50 bg-black/30'
+        : 'border-gray-200/50 bg-white/50'
         }`}>
+        <span className={`text-xs transition-colors ${isDark
+          ? 'text-gray-500'
+          : 'text-gray-600'
+          }`}>
           {value.split('\n').length} lines
         </span>
-        <span className={`text-xs transition-colors ${
-          isDark
-            ? 'text-gray-500'
-            : 'text-gray-600'
-        }`}>
+        <span className={`text-xs transition-colors ${isDark
+          ? 'text-gray-500'
+          : 'text-gray-600'
+          }`}>
           {value.length} characters
         </span>
       </div>
