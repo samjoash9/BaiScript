@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "ast.h"      
-#include "yacc.tab.h" 
-#include "semantic_analyzer.h"  
+#include "ast.h"
+#include "yacc.tab.h"
+#include "semantic_analyzer.h"
 #include "intermediate_code_generator.h"
 #include "target_code_generator.h"
 #include "machine_code_generator.h"
@@ -17,20 +17,22 @@ extern ASTNode *root;
 int parse_failed = 0;
 int sem_errors = 0;
 
-void write_error_file(const char *filename, const char *msg) {
+void write_error_file(const char *filename, const char *msg)
+{
     FILE *f = fopen(filename, "w");
-    if (f) {
+    if (f)
+    {
         fprintf(f, "%s\n", msg);
         fclose(f);
     }
 }
 
-
 int main()
 {
     // === STEP 0: OPEN SOURCE FILE ===
     yyin = fopen("input.txt", "r");
-    if (!yyin) {
+    if (!yyin)
+    {
         printf("Error: unable to open input.txt\n");
         return 1;
     }
@@ -40,11 +42,14 @@ int main()
 
     int result = yyparse();
 
-    if (result == 0 && !parse_failed) {
+    if (result == 0 && !parse_failed)
+    {
         printf("[PARSE] Accepted\n\n");
         printf("== AST ==\n");
         print_ast(root, 0);
-    } else {
+    }
+    else
+    {
         printf("[PARSE] Rejected\n");
         write_error_file("output_assembly.txt", "No assembly generated due to parse errors.");
         write_error_file("output_machine.txt", "No machine code generated due to parse errors.");
@@ -56,16 +61,22 @@ int main()
     // === STEP 2: SEMANTIC ANALYSIS ===
     printf("\n=== BaiScript SEMANTIC ANALYSIS ===\n\n");
 
-    if (result == 0 && !parse_failed) {
+    if (result == 0 && !parse_failed)
+    {
         // analyze AST
-        sem_errors = semantic_analyzer();  // assign to global
+        sem_errors = semantic_analyzer(); // assign to global
 
-        if (sem_errors == 0) {
+        if (sem_errors == 0)
+        {
             printf("[MAIN] Semantic analysis passed.\n");
-        } else {
+        }
+        else
+        {
             printf("[MAIN] Semantic analysis failed with %d error(s).\n", sem_errors);
         }
-    } else {
+    }
+    else
+    {
         printf("[MAIN] Skipping semantic analysis due to parse errors.\n");
     }
 
@@ -74,12 +85,17 @@ int main()
     // === STEP 3: INTERMEDIATE CODE GENERATION ===
     printf("\n=== BaiScript INTERMEDIATE CODE GENERATION ===\n\n");
 
-    if (sem_errors > 0) {
+    if (sem_errors > 0)
+    {
         printf("[MAIN] Skipping intermediate code generation due to semantic errors.\n");
         write_error_file("output_tac.txt", "No TAC generated due to semantic errors.");
-    } else if (result == 0 && !parse_failed) {
+    }
+    else if (result == 0 && !parse_failed)
+    {
         generate_intermediate_code(root);
-    } else {
+    }
+    else
+    {
         printf("[MAIN] Skipping intermediate code generation due to parse errors.\n");
     }
 
@@ -88,12 +104,17 @@ int main()
     // === STEP 4: TARGET CODE GENERATION ===
     printf("\n=== BaiScript TARGET CODE GENERATION ===\n\n");
 
-    if (sem_errors > 0) {
+    if (sem_errors > 0)
+    {
         printf("[MAIN] Skipping target code generation due to semantic errors.\n");
         write_error_file("output_assembly.txt", "No assembly generated due to semantic errors.");
-    } else if (result == 0 && !parse_failed) {
+    }
+    else if (result == 0 && !parse_failed)
+    {
         generate_target_code();
-    } else {
+    }
+    else
+    {
         printf("[MAIN] Skipping target code generation due to parse errors.\n");
     }
 
@@ -102,12 +123,17 @@ int main()
     // === STEP 5: MACHINE CODE GENERATION ===
     printf("\n=== BaiScript MACHINE CODE GENERATION ===\n\n");
 
-    if (sem_errors > 0) {
+    if (sem_errors > 0)
+    {
         printf("[MAIN] Skipping machine code generation due to semantic errors.\n");
         write_error_file("output_machine.txt", "No machine code generated due to semantic errors.");
-    } else if (result == 0 && !parse_failed) {
+    }
+    else if (result == 0 && !parse_failed)
+    {
         generate_machine_code();
-    } else {
+    }
+    else
+    {
         printf("[MAIN] Skipping machine code generation due to parse errors.\n");
     }
 
@@ -119,5 +145,5 @@ int main()
 
     fclose(yyin);
 
-    return sem_errors > 0 ? 1 : 0;  // return 1 if semantic errors
+    return sem_errors > 0 ? 1 : 0;
 }

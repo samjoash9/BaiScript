@@ -1,10 +1,2 @@
-ENTEGER a = (3 + 5 * (2 - 8 / (1 + 1))) - ((4 * 2) / (1 + 1)) + (7 - 3) * (2 + 3 * (1 + 1)) - (6 - 2 * (3 - 1))!
-
-PRENT "the answer is", a!
-
-PRENT "the answer is", a!
-
-KUAN b!
-PRENT "the answer is", b!
-
-PRENT 1+2, "Hello", c!
+ENTEGER a = (1 + 2) / 10 * 3!
+PRENT a!
