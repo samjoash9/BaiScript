@@ -1,3 +1,0 @@
-
-[SEM WARNING] Variable 'c' declared but never used [line:10]
-[SEM] Analysis completed: 0 semantic error(s), 1 warning(s)

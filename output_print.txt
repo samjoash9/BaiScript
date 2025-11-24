@@ -1,4 +1,1 @@
-2
-5
-4
-4
+[LEX] Invalid (;) [line:1]

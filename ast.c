@@ -3,6 +3,9 @@
 #include <string.h>
 #include "ast.h"
 
+
+int islexerror = 0;
+
 ASTNode *root = NULL;
 
 ASTNode *new_node(NodeType type, const char *val, ASTNode *l, ASTNode *r, int line)

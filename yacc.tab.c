@@ -1498,7 +1498,7 @@ yyreduce:
   case 10:
 /* Line 1792 of yacc.c  */
 #line 68 "yacc.y"
-    { yyerror("Invalid statement"); yyerrok; ++lineCount; }
+    { yyerror("Invalid statement"); yyerrok; ++lineCount; islexerror=0; }
     break;
 
   case 11:
@@ -2022,6 +2022,14 @@ yyreturn:
 
 /* Error handler */
 void yyerror(const char *s) {
+    if (islexerror == 0) {               // only log if no previous error
+        FILE *out = fopen("output_print.txt", "w"); // overwrite
+        if (out) {
+            fprintf(out, "[PARSE] Syntax Invalid [line:%d]\n", lineCount);
+            fclose(out);
+        }
+        islexerror = 1;                  // mark that an error was logged
+    }
     parse_failed = 1;
-    fprintf(stderr, "[PARSE] Rejected (%s) [line:%d]\n", s ? s : "syntax error", lineCount);
 }
+

@@ -29,28 +29,35 @@ void write_error_file(const char *filename, const char *msg)
 
 int main()
 {
+
     // === STEP 0: OPEN SOURCE FILE ===
     yyin = fopen("input.txt", "r");
     if (!yyin)
     {
         printf("Error: unable to open input.txt\n");
         return 1;
+        
     }
 
     printf("=== BaiScript IS PARSING! ===\n\n");
-    parse_failed = 0;
-
+  
+    parse_failed = 0;  // reset before starting
+    islexerror = 0; // reset before starting
     int result = yyparse();
 
     if (result == 0 && !parse_failed)
     {
+        // Emtying all the files at the start
+        write_error_file("output_assembly.txt", "");
+        write_error_file("output_machine.txt", "");
+        write_error_file("output_tac.txt", "");
+        write_error_file("output_print.txt", "");
         printf("[PARSE] Accepted\n\n");
         printf("== AST ==\n");
         print_ast(root, 0);
     }
     else
     {
-        printf("[PARSE] Rejected\n");
         write_error_file("output_assembly.txt", "No assembly generated due to parse errors.");
         write_error_file("output_machine.txt", "No machine code generated due to parse errors.");
         write_error_file("output_tac.txt", "No TAC generated due to parse errors.");

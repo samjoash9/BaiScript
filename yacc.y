@@ -65,7 +65,7 @@ STATEMENT:
     | SIMPLE_EXPR EXCLAM       { $$ = new_node(NODE_STATEMENT, "EXPR_STMT", $1, NULL, lineCount); }
     | PRINTING EXCLAM          { $$ = new_node(NODE_STATEMENT, "PRINT_STMT", $1, NULL, lineCount); }
     | EXCLAM                   { $$ = new_node(NODE_STATEMENT, "EMPTY!", NULL, NULL, lineCount); }
-    | error NEWLINE            { yyerror("Invalid statement"); yyerrok; ++lineCount; }
+    | error NEWLINE            { yyerror("Invalid statement"); yyerrok; ++lineCount; islexerror=0; }
     | NEWLINE                  { ++lineCount; }
 ;
 
@@ -213,6 +213,14 @@ PRIMARY:
 
 /* Error handler */
 void yyerror(const char *s) {
+    if (islexerror == 0) {               // only log if no previous error
+        FILE *out = fopen("output_print.txt", "w"); // overwrite
+        if (out) {
+            fprintf(out, "[PARSE] Syntax Invalid [line:%d]\n", lineCount);
+            fclose(out);
+        }
+        islexerror = 1;                  // mark that an error was logged
+    }
     parse_failed = 1;
-    fprintf(stderr, "[PARSE] Rejected (%s) [line:%d]\n", s ? s : "syntax error", lineCount);
 }
+

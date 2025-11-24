@@ -31,6 +31,8 @@ typedef struct ASTNode {
 
 extern ASTNode *root;
 
+extern int islexerror;
+
 ASTNode *new_node(NodeType type, const char *val, ASTNode *l, ASTNode *r, int line);
 void print_ast(ASTNode *node, int level);
 

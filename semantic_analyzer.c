@@ -10,7 +10,7 @@
 
 /* ----------------------------
    Internal structures
-   ---------------------------- */
+---------------------------- */
 
 static SEM_TEMP *sem_temps = NULL;
 static size_t sem_temps_capacity = 0;
@@ -26,8 +26,7 @@ static KnownVar *known_vars_head = NULL;
 static int sem_errors = 0;
 static int sem_warnings = 0;
 
-static FILE *sem_out = NULL;
-static FILE *print_out = NULL; 
+static FILE *out_file = NULL; 
 
 /* Deferred postfix ops */
 typedef struct DeferredOp {
@@ -40,65 +39,43 @@ static DeferredOp *deferred_head = NULL;
 
 /* ----------------------------
    Helpers: error/warning
-   ---------------------------- */
+---------------------------- */
 
 static void sem_record_error(ASTNode *node, const char *fmt, ...)
 {
     sem_errors++;
 
-    fprintf(stderr, "[SEM ERROR] ");
-    if (sem_out) fprintf(sem_out, "[SEM ERROR] ");
+    if (!out_file) return;
+
+    fprintf(out_file, "[SEM ERROR] ");
 
     va_list ap;
     va_start(ap, fmt);
-    vfprintf(stderr, fmt, ap);        
-    if (sem_out) vfprintf(sem_out, fmt, ap); 
+    vfprintf(out_file, fmt, ap); 
     va_end(ap);
 
-    if (node) {
-        fprintf(stderr, " [line:%d]", node->line);
-        if (sem_out) fprintf(sem_out, " [line:%d]", node->line);
-    }
-
-    fprintf(stderr, "\n");
-    if (sem_out) fprintf(sem_out, "\n");
+    if (node) fprintf(out_file, " [line:%d]\n", node->line);
 }
-
 
 static void sem_record_warning(ASTNode *node, const char *fmt, ...)
 {
     sem_warnings++;
 
-    fprintf(stderr, "[SEM WARNING] ");
-    if (sem_out) fprintf(sem_out, "[SEM WARNING] ");
+    if (!out_file) return;
+
+    fprintf(out_file, "[SEM WARNING] ");
 
     va_list ap;
-
-    // First print to stderr
     va_start(ap, fmt);
-    vfprintf(stderr, fmt, ap);
+    vfprintf(out_file, fmt, ap);
     va_end(ap);
 
-    // Then restart the va_list and print to file
-    if (sem_out) {
-        va_start(ap, fmt);   // <-- REQUIRED
-        vfprintf(sem_out, fmt, ap);
-        va_end(ap);
-    }
-
-    if (node) {
-        fprintf(stderr, " [line:%d]", node->line);
-        if (sem_out) fprintf(sem_out, " [line:%d]", node->line);
-    }
-
-    fprintf(stderr, "\n");
-    if (sem_out) fprintf(sem_out, "\n");
+    if (node) fprintf(out_file, " [line:%d]\n", node->line);
 }
-
 
 /* ----------------------------
    Dynamic arrays helpers
-   ---------------------------- */
+---------------------------- */
 
 static int ensure_temp_capacity(void)
 {
@@ -128,7 +105,7 @@ static int ensure_ops_capacity(void)
 
 /* ----------------------------
    Deferred postfix helpers
-   ---------------------------- */
+---------------------------- */
 static void push_deferred_op(KnownVar *kv, int delta)
 {
     DeferredOp *d = (DeferredOp*)malloc(sizeof(DeferredOp));
@@ -141,9 +118,9 @@ static void push_deferred_op(KnownVar *kv, int delta)
 
 static void apply_deferred_ops(void)
 {
-    // Apply in FIFO order (reverse the list we built LIFO)
     if (!deferred_head) return;
-    // Reverse the list
+
+    // Reverse the list for FIFO
     DeferredOp *prev = NULL, *cur = deferred_head;
     while (cur) { DeferredOp *n = cur->next; cur->next = prev; prev = cur; cur = n; }
     DeferredOp *r = prev;
@@ -153,8 +130,7 @@ static void apply_deferred_ops(void)
         KnownVar *kv = p->kv;
         if (!kv) continue;
         if (!kv->initialized) {
-            // applying postfix to uninitialized - warn
-            sem_record_error(kv->temp.node ? kv->temp.node : NULL, "Postfix operation on uninitialized variable '%s'", kv->name);
+            sem_record_error(kv->temp.node, "Postfix operation on uninitialized variable '%s'", kv->name);
             continue;
         }
         long before = kv->temp.is_constant ? kv->temp.int_value : 0;
@@ -178,7 +154,7 @@ static void apply_deferred_ops(void)
 
 /* ----------------------------
    Public helpers
-   ---------------------------- */
+---------------------------- */
 
 SEM_TEMP sem_new_temp(SEM_TYPE type)
 {
@@ -192,11 +168,10 @@ SEM_TEMP sem_new_temp(SEM_TYPE type)
     t.type = type;
     t.is_constant = 0;
     t.int_value = 0;
-    t.node = NULL;                 // do NOT allocate dummy node here
+    t.node = NULL;
     sem_temps[sem_temps_count++] = t;
     return t;
 }
-
 
 KnownVar* sem_find_var(const char *name)
 {
@@ -215,7 +190,7 @@ KnownVar* sem_add_var(const char *name, SEM_TYPE type)
     if (!k) return NULL;
     k->name = strdup(name);
     k->temp = sem_new_temp(type);
-    k->temp.node = NULL; // will be attached by caller if needed
+    k->temp.node = NULL;
     k->initialized = 0;
     k->used = 0;
     k->next = known_vars_head;
@@ -248,7 +223,7 @@ SEM_TYPE sem_type_from_string(const char *s)
 
 /* ----------------------------
    Constant helpers
-   ---------------------------- */
+---------------------------- */
 
 static int try_parse_int(const char *s, long *out)
 {
@@ -285,9 +260,12 @@ static int try_parse_char_literal(const char *lex, long *out)
 
 /* ----------------------------
    Expression evaluation
-   ---------------------------- */
+---------------------------- */
 
 static SEM_TEMP evaluate_expression(ASTNode *node);
+static SEM_TEMP eval_factor(ASTNode *node);
+static SEM_TEMP eval_term(ASTNode *node);
+static SEM_TEMP eval_additive(ASTNode *node);
 
 static SEM_TEMP eval_factor(ASTNode *node)
 {
@@ -547,67 +525,59 @@ static SEM_TEMP evaluate_expression(ASTNode *node)
 }
 
 /* ----------------------------
-   Handle print statements
-   ---------------------------- */
+   Buffers for output
+---------------------------- */
+#define PRINT_BUFFER_SIZE 8192
+static char print_buffer[PRINT_BUFFER_SIZE];
+static size_t print_offset = 0;
+
+static void buffer_print(const char *s)
+{
+    if (!s) return;
+    size_t len = strlen(s);
+    if (print_offset + len < PRINT_BUFFER_SIZE - 2)
+    {
+        strcpy(print_buffer + print_offset, s);
+        print_offset += len;
+    }
+}
+
+
+/* ----------------------------
+   Handle print statements (buffered)
+---------------------------- */
 static void handle_print(ASTNode *print_node)
 {
     if (!print_node) return;
 
-    if (!print_out) {
-        print_out = fopen("output_print.txt", "w");
-        if (!print_out) fprintf(stderr, "[SEM] Failed to open output_print.txt\n");
-    }
-
-    ASTNode *item = print_node->left; // PRINT_LIST or PRINT_ITEM
-
+    ASTNode *item = print_node->left;
     while (item)
     {
         ASTNode *expr = item->left ? item->left : item;
+        char tempbuf[1024] = {0};
 
         if (expr->type == NODE_LITERAL)
         {
             const char *val = expr->value;
             size_t len = strlen(val);
-            char buffer[1024]; // adjust size if needed
-
-            if (len >= 2 && val[0] == '"' && val[len-1] == '"') {
-                strncpy(buffer, val + 1, len - 2); // copy without quotes
-                buffer[len - 2] = '\0';
-            } else {
-                strncpy(buffer, val, sizeof(buffer));
-                buffer[sizeof(buffer)-1] = '\0';
-            }
-
-            fprintf(print_out, "%s", buffer);
-            printf("%s", buffer);
-        }
-        else if (expr->type == NODE_IDENTIFIER)
-        {
-            SEM_TEMP val = eval_factor(expr);  // ← this marks KnownVar->used correctly
-
-            if (val.is_constant)
-            {
-                fprintf(print_out, "%ld", val.int_value);
-                printf("%ld", val.int_value);
-            }
+            if (len >= 2 && val[0] == '"' && val[len-1] == '"')
+                snprintf(tempbuf, sizeof(tempbuf), "%.*s", (int)(len-2), val+1);
+            else
+                snprintf(tempbuf, sizeof(tempbuf), "%s", val);
         }
         else
         {
             SEM_TEMP val = evaluate_expression(expr);
-            if (val.is_constant)
-            {
-                fprintf(print_out, "%ld", val.int_value);
-                printf("%ld", val.int_value);
-            }
+            if (val.is_constant) snprintf(tempbuf, sizeof(tempbuf), "%ld", val.int_value);
         }
 
-        item = item->right; // next PRINT_ITEM
-
+        buffer_print(tempbuf);
+        item = item->right;
     }
 
-    fprintf(print_out, "\n");
-    printf("\n");
+    buffer_print("\n");
 }
+
 
 
 /* ----------------------------
@@ -742,7 +712,7 @@ static void handle_assignment(ASTNode *assign_node)
 
 /* ----------------------------
    AST traversal
-   ---------------------------- */
+---------------------------- */
 
 static void analyze_node(ASTNode *node)
 {
@@ -756,7 +726,6 @@ static void analyze_node(ASTNode *node)
             break;
         case NODE_STATEMENT:
             analyze_node(node->left);
-            // Apply deferred postfix ops after each statement as requested
             apply_deferred_ops();
             break;
         case NODE_DECLARATION:
@@ -780,13 +749,12 @@ static void analyze_node(ASTNode *node)
 
 /* ----------------------------
    Check unused
-   ---------------------------- */
+---------------------------- */
 
 static void check_unused_variables(void)
 {
     for (KnownVar *k = known_vars_head; k; k = k->next)
     {
-        // Always pass a valid node
         ASTNode *node = k->temp.node;
         if (!k->used)
             sem_record_warning(node, "Variable '%s' declared but never used", k->name);
@@ -795,41 +763,56 @@ static void check_unused_variables(void)
 
 /* ----------------------------
    Public API
-   ---------------------------- */
+---------------------------- */
 
+/* ----------------------------
+   Semantic analyzer
+---------------------------- */
 int semantic_analyzer(void)
 {
-
-    // Always overwrite old content (not append)
-    sem_out = fopen("semantic_error.txt", "w");
-    if (!sem_out)
-        fprintf(stderr, "[SEM] Failed to open semantic_error.txt\n");
+    // overwrite old file
+    out_file = fopen("output_print.txt", "w");
+    if (!out_file) { fprintf(stderr, "[SEM] Failed to open output_print.txt\n"); return 0; }
 
     sem_errors = 0; sem_warnings = 0;
     sem_next_temp_id = 1;
     sem_temps_count = 0; sem_ops_count = 0;
+    print_offset = 0;
+    print_buffer[0] = '\0';
 
+    // free known vars
     KnownVar *k = known_vars_head;
     while (k) { KnownVar *n = k->next; free(k->name); free(k); k = n; }
     known_vars_head = NULL;
 
-    if (!root) { fprintf(stderr, "[SEM] No AST\n"); return 0; }
+    if (!root) { fprintf(stderr, "[SEM] No AST\n"); fclose(out_file); return 0; }
 
+    // Traverse AST
     analyze_node(root);
-    check_unused_variables();
 
-    printf("[SEM] Analysis completed: %d semantic error(s), %d warning(s)\n", sem_errors, sem_warnings);
-    if (sem_out) fprintf(sem_out, "[SEM] Analysis completed: %d semantic error(s), %d warning(s)\n", sem_errors, sem_warnings);
-    
-    if (sem_out) {
-        fclose(sem_out);
-        sem_out = NULL;
+
+    // If errors exist, discard buffered prints
+    if (sem_errors > 0)
+    {
+        print_offset = 0;
+        print_buffer[0] = '\0';
+    }
+    else
+    {
+        // No errors: flush buffered prints
+        if (print_offset > 0) fprintf(out_file, "%s", print_buffer);
     }
 
-    if (print_out) {
-        fclose(print_out);
-        print_out = NULL;
+
+    if (sem_errors == 0){
+        // Write semantic analysis summary
+        fprintf(out_file, "\n\n=== COMPILATION SUCCESSFULL ===\n\n");
+        check_unused_variables();
+        fprintf(out_file, "[SEM] Analysis completed: %d semantic error(s), %d warning(s)\n", sem_errors, sem_warnings);
     }
+
+    fclose(out_file);
+    out_file = NULL;
 
     return sem_errors;
 }
@@ -843,9 +826,10 @@ void sem_cleanup(void)
     KnownVar *k = known_vars_head;
     while (k) { KnownVar *n = k->next; free(k->name); free(k); k = n; }
     known_vars_head = NULL;
-    // free any remaining deferred ops
+
     DeferredOp *d = deferred_head;
     while (d) { DeferredOp *n = d->next; free(d); d = n; }
     deferred_head = NULL;
+
     sem_errors = 0; sem_warnings = 0;
 }
