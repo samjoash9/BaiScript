@@ -1,3 +1,2 @@
-ENTEGER a = 1!
-
+ENTEGER a = (1 + 2) / 10 * 3!
 PRENT a!

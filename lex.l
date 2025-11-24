@@ -1,13 +1,16 @@
 %{
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 #include "ast.h"
 #include "yacc.tab.h"
 
-extern void yyerror(const char *s);
+// Add this line so lex knows about the global parse_failed
+extern int parse_failed;
 extern int lineCount;
+extern void yyerror(const char *s);
 %}
+
 
 %x COMMENT
 %option noyywrap
@@ -64,7 +67,18 @@ extern int lineCount;
 \n                    { lineCount++; printf("[LEX] NEWLINE\n"); }
 
 
-.                     { printf("[LEX] INVALID (%s)\n", yytext); yyerror("Invalid character"); }
+.                     {
+                        if (islexerror == 0) {              // only log the first error
+                            FILE *out = fopen("output_print.txt", "w"); // overwrite the file
+                            if(out) {
+                                fprintf(out, "[LEX] Invalid (%s) [line:%d]\n", yytext, lineCount);
+                                fclose(out);
+                            }
+                            islexerror = 1;                 // mark that an error was logged
+                        }
+                        parse_failed = 1;
+                      }
+
 
 %%
 
