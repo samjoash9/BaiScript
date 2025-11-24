@@ -1,1 +1,21 @@
-No assembly generated due to parse errors.
+.data
+a: .word64 0
+
+.code
+; temp0 = 1 + 2
+daddiu r1, r0, 1
+daddiu r2, r0, 2
+daddu r3, r1, r2
+
+; temp1 = temp0 / 10
+ld r1, temp0(r0)
+daddiu r2, r0, 10
+ddiv r1, r2
+mflo r3
+
+; a = temp1 * 3
+ld r1, temp1(r0)
+daddiu r2, r0, 3
+dmult r1, r2
+mflo r3
+sd r3, a(r0)
