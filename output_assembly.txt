@@ -1,1 +1,1 @@
-No assembly generated due to semantic errors.
+No assembly generated due to parse errors.

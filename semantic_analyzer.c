@@ -1,4 +1,3 @@
-
 #include "semantic_analyzer.h"
 #include "ast.h"
 #include "symbol_table.h"
@@ -30,6 +29,15 @@ static int sem_warnings = 0;
 static FILE *sem_out = NULL;
 static FILE *print_out = NULL; 
 
+/* Deferred postfix ops */
+typedef struct DeferredOp {
+    KnownVar *kv;
+    int delta; // +1 for ++, -1 for --
+    struct DeferredOp *next;
+} DeferredOp;
+
+static DeferredOp *deferred_head = NULL;
+
 /* ----------------------------
    Helpers: error/warning
    ---------------------------- */
@@ -55,7 +63,6 @@ static void sem_record_error(ASTNode *node, const char *fmt, ...)
     fprintf(stderr, "\n");
     if (sem_out) fprintf(sem_out, "\n");
 }
-
 
 
 static void sem_record_warning(ASTNode *node, const char *fmt, ...)
@@ -120,6 +127,56 @@ static int ensure_ops_capacity(void)
 }
 
 /* ----------------------------
+   Deferred postfix helpers
+   ---------------------------- */
+static void push_deferred_op(KnownVar *kv, int delta)
+{
+    DeferredOp *d = (DeferredOp*)malloc(sizeof(DeferredOp));
+    if (!d) return;
+    d->kv = kv;
+    d->delta = delta;
+    d->next = deferred_head;
+    deferred_head = d;
+}
+
+static void apply_deferred_ops(void)
+{
+    // Apply in FIFO order (reverse the list we built LIFO)
+    if (!deferred_head) return;
+    // Reverse the list
+    DeferredOp *prev = NULL, *cur = deferred_head;
+    while (cur) { DeferredOp *n = cur->next; cur->next = prev; prev = cur; cur = n; }
+    DeferredOp *r = prev;
+
+    for (DeferredOp *p = r; p; p = p->next)
+    {
+        KnownVar *kv = p->kv;
+        if (!kv) continue;
+        if (!kv->initialized) {
+            // applying postfix to uninitialized - warn
+            sem_record_error(kv->temp.node ? kv->temp.node : NULL, "Postfix operation on uninitialized variable '%s'", kv->name);
+            continue;
+        }
+        long before = kv->temp.is_constant ? kv->temp.int_value : 0;
+        long after = before + p->delta;
+        kv->temp.is_constant = 1;
+        kv->temp.int_value = after;
+        kv->initialized = 1;
+
+        int idx = find_symbol(kv->name);
+        if (idx != -1) {
+            symbol_table[idx].initialized = 1;
+            snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", after);
+        }
+    }
+
+    // free list
+    DeferredOp *it = r;
+    while (it) { DeferredOp *n = it->next; free(it); it = n; }
+    deferred_head = NULL;
+}
+
+/* ----------------------------
    Public helpers
    ---------------------------- */
 
@@ -135,9 +192,7 @@ SEM_TEMP sem_new_temp(SEM_TYPE type)
     t.type = type;
     t.is_constant = 0;
     t.int_value = 0;
-    // Always assign a dummy node if none exists to preserve line info
-    t.node = (ASTNode*)malloc(sizeof(ASTNode));
-    if (t.node) { t.node->line = 0; t.node->type = NODE_UNKNOWN; t.node->value = NULL; }
+    t.node = NULL;                 // do NOT allocate dummy node here
     sem_temps[sem_temps_count++] = t;
     return t;
 }
@@ -160,11 +215,7 @@ KnownVar* sem_add_var(const char *name, SEM_TYPE type)
     if (!k) return NULL;
     k->name = strdup(name);
     k->temp = sem_new_temp(type);
-    // Always ensure the temp has a node
-    if (!k->temp.node) {
-        k->temp.node = (ASTNode*)malloc(sizeof(ASTNode));
-        if (k->temp.node) { k->temp.node->line = 0; k->temp.node->type = NODE_UNKNOWN; k->temp.node->value = NULL; }
-    }
+    k->temp.node = NULL; // will be attached by caller if needed
     k->initialized = 0;
     k->used = 0;
     k->next = known_vars_head;
@@ -225,7 +276,7 @@ static int try_parse_char_literal(const char *lex, long *out)
             case '0': *out = '\0'; return 1;
             case '\\': *out = '\\'; return 1;
             case '\'': *out = '\''; return 1;
-            case '\"': *out = '\"'; return 1;
+            case '"': *out = '"'; return 1;
             default: return 0;
         }
     }
@@ -295,6 +346,13 @@ static SEM_TEMP eval_factor(ASTNode *node)
         KnownVar *new_kv = sem_add_var(name, stype);
         new_kv->used = 1;
         new_kv->initialized = symbol_table[idx].initialized;
+        if (symbol_table[idx].initialized) {
+            long vv = 0;
+            if (try_parse_int(symbol_table[idx].value_str, &vv)) {
+                new_kv->temp.is_constant = 1;
+                new_kv->temp.int_value = vv;
+            }
+        }
         return placeholder;
     }
 
@@ -306,11 +364,17 @@ static SEM_TEMP eval_term(ASTNode *node)
     if (!node) return sem_new_temp(SEM_TYPE_UNKNOWN);
     if (node->type != NODE_TERM) return eval_factor(node);
 
+    if (!node->left || !node->right) {
+        if (node->left) evaluate_expression(node->left);
+        if (node->right) evaluate_expression(node->right);
+        return sem_new_temp(SEM_TYPE_UNKNOWN);
+    }
+
     SEM_TEMP L = eval_term(node->left);
     SEM_TEMP R = eval_factor(node->right);
     const char *op = node->value ? node->value : "";
 
-    if (L.is_constant && R.is_constant && op)
+    if (L.is_constant && R.is_constant && op[0] != '\0')
     {
         long val = 0;
         if (strcmp(op, "*") == 0)
@@ -329,6 +393,9 @@ static SEM_TEMP eval_term(ASTNode *node)
                 val = L.int_value / R.int_value;
             }
         }
+        else {
+            goto no_fold_term;
+        }
         SEM_TEMP t = sem_new_temp(SEM_TYPE_INT);
         t.is_constant = 1;
         t.int_value = val;
@@ -336,10 +403,12 @@ static SEM_TEMP eval_term(ASTNode *node)
         return t;
     }
 
-
-    SEM_TEMP res = sem_new_temp(SEM_TYPE_INT);
+no_fold_term:
+    {
+        SEM_TEMP res = sem_new_temp(SEM_TYPE_INT);
     res.node = node;
     return res;
+    }
 }
 
 static SEM_TEMP eval_additive(ASTNode *node)
@@ -347,15 +416,22 @@ static SEM_TEMP eval_additive(ASTNode *node)
     if (!node) return sem_new_temp(SEM_TYPE_UNKNOWN);
     if (node->type != NODE_EXPRESSION) return eval_term(node);
 
+    if (!node->left || !node->right) {
+        if (node->left) evaluate_expression(node->left);
+        if (node->right) evaluate_expression(node->right);
+        return sem_new_temp(SEM_TYPE_UNKNOWN);
+    }
+
     SEM_TEMP L = eval_additive(node->left);
     SEM_TEMP R = eval_term(node->right);
     const char *op = node->value ? node->value : "";
 
-    if (L.is_constant && R.is_constant && op)
+    if (L.is_constant && R.is_constant && op[0] != '\0')
     {
         long val = 0;
         if (strcmp(op, "+") == 0) val = L.int_value + R.int_value;
         else if (strcmp(op, "-") == 0) val = L.int_value - R.int_value;
+        else goto no_fold_add;
         SEM_TEMP t = sem_new_temp(SEM_TYPE_INT);
         t.is_constant = 1;
         t.int_value = val;
@@ -363,9 +439,12 @@ static SEM_TEMP eval_additive(ASTNode *node)
         return t;
     }
 
-    SEM_TEMP res = sem_new_temp(SEM_TYPE_INT);
+no_fold_add:
+    {
+        SEM_TEMP res = sem_new_temp(SEM_TYPE_INT);
     res.node = node;
     return res;
+    }
 }
 
 static SEM_TEMP evaluate_expression(ASTNode *node)
@@ -378,18 +457,86 @@ static SEM_TEMP evaluate_expression(ASTNode *node)
         case NODE_EXPRESSION: return eval_additive(node);
         case NODE_UNARY_OP:
         {
-            SEM_TEMP t = evaluate_expression(node->left);
-            if (t.is_constant && node->value)
-            {
-                SEM_TEMP r = sem_new_temp(t.type);
+            // prefix operators: e.g. ++a, --a, unary -
+            const char *op = node->value ? node->value : "";
+            if (op && (strcmp(op, "++") == 0 || strcmp(op, "--") == 0)) {
+                ASTNode *target = node->left;
+                if (!target || target->type != NODE_IDENTIFIER) {
+                    sem_record_error(node, "Prefix %s applied to non-identifier", op);
+                    return sem_new_temp(SEM_TYPE_UNKNOWN);
+                }
+                const char *name = target->value;
+                KnownVar *kv = sem_find_var(name);
+                if (!kv) kv = sem_add_var(name, SEM_TYPE_INT);
+                if (!kv->initialized) {
+                    sem_record_error(target, "Prefix %s on uninitialized variable '%s'", op, name);
+                    // but still mark initialized and continue
+                    kv->initialized = 1;
+                    kv->temp.is_constant = 1;
+                    kv->temp.int_value = 0;
+                }
+                int delta = (strcmp(op, "++") == 0) ? 1 : -1;
+                long newval = (kv->temp.is_constant ? kv->temp.int_value : 0) + delta;
+                kv->temp.is_constant = 1;
+                kv->temp.int_value = newval;
+                kv->initialized = 1;
+
+                int idx = find_symbol(kv->name);
+                if (idx != -1) {
+                    symbol_table[idx].initialized = 1;
+                    snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", newval);
+                }
+
+                SEM_TEMP r = sem_new_temp(SEM_TYPE_INT);
                 r.is_constant = 1;
-                r.int_value = strcmp(node->value, "-") == 0 ? -t.int_value : t.int_value;
+                r.int_value = newval;
                 r.node = node;
                 return r;
             }
-            return t;
+            // unary minus and other unary ops
+            {
+                SEM_TEMP t = evaluate_expression(node->left);
+                if (t.is_constant && op && op[0] != '\0' && strcmp(op, "-") == 0)
+                {
+                    SEM_TEMP r = sem_new_temp(t.type);
+                    r.is_constant = 1;
+                    r.int_value = -t.int_value;
+                    r.node = node;
+                    return r;
+                }
+                return t;
+            }
         }
-        case NODE_POSTFIX_OP: return evaluate_expression(node->left);
+        case NODE_POSTFIX_OP:
+        {
+            // postfix op: return old value but schedule increment/decrement
+            const char *op = node->value ? node->value : "";
+            ASTNode *target = node->left;
+            if (!target || target->type != NODE_IDENTIFIER) {
+                sem_record_error(node, "Postfix %s applied to non-identifier", op);
+                return sem_new_temp(SEM_TYPE_UNKNOWN);
+            }
+            const char *name = target->value;
+            KnownVar *kv = sem_find_var(name);
+            if (!kv) kv = sem_add_var(name, SEM_TYPE_INT);
+
+            // old value to return
+            SEM_TEMP old = kv->temp;
+            old.node = node;
+            if (!kv->initialized) {
+                // per C semantics using uninitialized is undefined; here we record error
+                sem_record_error(target, "Use of uninitialized variable '%s' in postfix operation", name);
+                old.is_constant = 0;
+            }
+
+            int delta = 0;
+            if (strcmp(op, "++") == 0) delta = 1;
+            else if (strcmp(op, "--") == 0) delta = -1;
+            if (delta != 0) {
+                push_deferred_op(kv, delta);
+            }
+            return old;
+        }
         case NODE_IDENTIFIER:
         case NODE_LITERAL: return eval_factor(node);
         default:
@@ -406,7 +553,6 @@ static void handle_print(ASTNode *print_node)
 {
     if (!print_node) return;
 
-    static FILE *print_out = NULL;
     if (!print_out) {
         print_out = fopen("output_print.txt", "w");
         if (!print_out) fprintf(stderr, "[SEM] Failed to open output_print.txt\n");
@@ -457,14 +603,11 @@ static void handle_print(ASTNode *print_node)
 
         item = item->right; // next PRINT_ITEM
 
-        // Add a space between items if there are more
-        if (item) { fprintf(print_out, " "); printf(" "); }
     }
 
     fprintf(print_out, "\n");
     printf("\n");
 }
-
 
 
 /* ----------------------------
@@ -555,16 +698,46 @@ static void handle_assignment(ASTNode *assign_node)
 
     SEM_TEMP rhs_temp = evaluate_expression(rhs);
 
-    int is_compound = assign_node->value && strlen(assign_node->value) == 2;
+    int is_compound = assign_node->value && strlen(assign_node->value) == 2; // e.g. "+="
     if (is_compound && !kv->initialized)
         sem_record_error(lhs, "Compound assignment to uninitialized variable '%s'", name);
 
-    kv->initialized = 1;
-    kv->temp.is_constant = rhs_temp.is_constant;
-    kv->temp.int_value = rhs_temp.is_constant ? rhs_temp.int_value : 0;
+    if (is_compound && kv->initialized && rhs_temp.is_constant)
+    {
+        const char *op = assign_node->value; // "+=", "-=", "*=", "/="
+        long lhs_val = kv->temp.is_constant ? kv->temp.int_value : 0;
+        long newval = lhs_val;
+        if (strcmp(op, "+=") == 0) newval = lhs_val + rhs_temp.int_value;
+        else if (strcmp(op, "-=") == 0) newval = lhs_val - rhs_temp.int_value;
+        else if (strcmp(op, "*=") == 0) newval = lhs_val * rhs_temp.int_value;
+        else if (strcmp(op, "/=") == 0) {
+            if (rhs_temp.int_value == 0) {
+                sem_record_error(assign_node, "Division by zero in compound assignment");
+                newval = 0;
+            } else newval = lhs_val / rhs_temp.int_value;
+        }
+        kv->initialized = 1;
+        kv->temp.is_constant = 1;
+        kv->temp.int_value = newval;
+        int idx = find_symbol(name);
+        if (idx != -1) {
+            symbol_table[idx].initialized = 1;
+            snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", newval);
+        }
+    }
+    else
+    {
+        // simple assignment or compound with non-constant RHS
+        kv->initialized = 1;
+        kv->temp.is_constant = rhs_temp.is_constant;
+        kv->temp.int_value = rhs_temp.is_constant ? rhs_temp.int_value : 0;
 
-    int idx = find_symbol(name);
-    if (idx != -1) symbol_table[idx].initialized = 1;
+        int idx = find_symbol(name);
+        if (idx != -1) {
+            symbol_table[idx].initialized = 1;
+            if (kv->temp.is_constant) snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", kv->temp.int_value);
+        }
+    }
 }
 
 /* ----------------------------
@@ -583,16 +756,21 @@ static void analyze_node(ASTNode *node)
             break;
         case NODE_STATEMENT:
             analyze_node(node->left);
+            // Apply deferred postfix ops after each statement as requested
+            apply_deferred_ops();
             break;
         case NODE_DECLARATION:
             handle_declaration(node);
+            apply_deferred_ops();
             break;
         case NODE_ASSIGNMENT:
             handle_assignment(node);
+            apply_deferred_ops();
             break;
         case NODE_PRINTING:
         case NODE_PRINT_ITEM:
             handle_print(node);
+            apply_deferred_ops();
             break;
         default:
             evaluate_expression(node);
@@ -641,7 +819,7 @@ int semantic_analyzer(void)
     check_unused_variables();
 
     printf("[SEM] Analysis completed: %d semantic error(s), %d warning(s)\n", sem_errors, sem_warnings);
-    fprintf(sem_out, "[SEM] Analysis completed: %d semantic error(s), %d warning(s)\n", sem_errors, sem_warnings);
+    if (sem_out) fprintf(sem_out, "[SEM] Analysis completed: %d semantic error(s), %d warning(s)\n", sem_errors, sem_warnings);
     
     if (sem_out) {
         fclose(sem_out);
@@ -665,5 +843,9 @@ void sem_cleanup(void)
     KnownVar *k = known_vars_head;
     while (k) { KnownVar *n = k->next; free(k->name); free(k); k = n; }
     known_vars_head = NULL;
+    // free any remaining deferred ops
+    DeferredOp *d = deferred_head;
+    while (d) { DeferredOp *n = d->next; free(d); d = n; }
+    deferred_head = NULL;
     sem_errors = 0; sem_warnings = 0;
 }

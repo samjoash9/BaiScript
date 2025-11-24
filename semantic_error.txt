@@ -1,2 +1,3 @@
-[SEM ERROR] Undeclared identifier 'c' [line:10]
-[SEM] Analysis completed: 1 semantic error(s), 0 warning(s)
+
+[SEM WARNING] Variable 'c' declared but never used [line:10]
+[SEM] Analysis completed: 0 semantic error(s), 1 warning(s)

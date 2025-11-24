@@ -1,1 +1,1 @@
-No machine code generated due to semantic errors.
+No machine code generated due to parse errors.
