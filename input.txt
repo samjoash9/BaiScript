@@ -12,3 +12,5 @@ PRENT c!
 PRENT 'c'!
 
 PRENT 2 / 2!
+ENTEGER a = (1 + 2) / 10 * 3!
+PRENT a!

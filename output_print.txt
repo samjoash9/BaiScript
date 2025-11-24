@@ -1,11 +1,1 @@
-9
-9
-11
-c
 1
-
-
-=== COMPILATION SUCCESSFULL ===
-
-[SEM WARNING] Variable 'b' declared but never used [line:5]
-[SEM] Analysis completed: 0 semantic error(s), 1 warning(s)
