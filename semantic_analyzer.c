@@ -25,6 +25,7 @@ static KnownVar *known_vars_head = NULL;
 
 static int sem_errors = 0;
 static int sem_warnings = 0;
+static int sem_inside_print = 0; // 1 if evaluating inside a PRENT
 
 static FILE *out_file = NULL; 
 
@@ -303,7 +304,8 @@ static SEM_TEMP eval_factor(ASTNode *node)
         KnownVar *kv = sem_find_var(name);
         if (kv)
         {
-            kv->used = 1;
+            kv->used = 1;  // mark as used
+            if (sem_inside_print) kv->used = 1; // redundant but explicit
             if (!kv->initialized)
                 sem_record_error(node, "Use of uninitialized variable '%s'", name);
             SEM_TEMP t = kv->temp;
@@ -446,6 +448,7 @@ static SEM_TEMP evaluate_expression(ASTNode *node)
                 }
                 const char *name = target->value;
                 KnownVar *kv = sem_find_var(name);
+                if (kv && sem_inside_print) kv->used = 1;
                 if (!kv) kv = sem_add_var(name, SEM_TYPE_INT);
                 if (!kv->initialized) {
                     sem_record_error(target, "Prefix %s on uninitialized variable '%s'", op, name);
@@ -497,13 +500,15 @@ static SEM_TEMP evaluate_expression(ASTNode *node)
             const char *name = target->value;
             KnownVar *kv = sem_find_var(name);
             if (!kv) kv = sem_add_var(name, SEM_TYPE_INT);
+            if (kv && sem_inside_print) kv->used = 1;
 
-            // Prepare return value (we will return the new value per requested semantics)
             SEM_TEMP ret = kv->temp;
             ret.node = node;
 
-            if (!kv->initialized) {
-                sem_record_error(target, "Use of uninitialized variable '%s' in postfix operation", name);
+            if (!kv->initialized)
+            {
+                if (!sem_inside_print)  // only warn if NOT inside PRENT
+                    sem_record_error(target, "Use of uninitialized variable '%s' in postfix operation", name);
                 ret.is_constant = 0;
             }
 
@@ -511,24 +516,22 @@ static SEM_TEMP evaluate_expression(ASTNode *node)
             if (strcmp(op, "++") == 0) delta = 1;
             else if (strcmp(op, "--") == 0) delta = -1;
 
-            if (delta != 0) {
-                // **APPLY IMMEDIATELY AND RETURN THE NEW VALUE**
+            if (delta != 0)
+            {
                 long before = (ret.is_constant ? ret.int_value : 0);
                 long after = before + delta;
 
-                // Update variable to after
                 kv->temp.is_constant = 1;
                 kv->temp.int_value = after;
                 kv->initialized = 1;
 
-                // Update symbol table if present
                 int idx = find_symbol(kv->name);
-                if (idx != -1) {
+                if (idx != -1)
+                {
                     symbol_table[idx].initialized = 1;
                     snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", after);
                 }
 
-                // Return the new value (after) — per requested semantics to get outputs 5/5/7
                 ret.is_constant = 1;
                 ret.int_value = after;
             }
@@ -570,6 +573,8 @@ static void handle_print(ASTNode *print_node)
 {
     if (!print_node) return;
 
+    sem_inside_print = 1; // Begin print context
+
     ASTNode *item = print_node->left;
     while (item)
     {
@@ -589,23 +594,34 @@ static void handle_print(ASTNode *print_node)
         }
         else
         {
-            // Evaluate the expression (postfix now updates immediately and returns the new value)
             SEM_TEMP val = evaluate_expression(expr);
 
-            // Use the evaluated value (val) or the variable temp captured by evaluate_expression.
-            if (expr->type == NODE_IDENTIFIER) {
+            if (expr->type == NODE_IDENTIFIER)
+            {
                 KnownVar *kv = sem_find_var(expr->value);
+                if (kv) kv->used = 1;  // mark as used
+
                 if (kv && kv->temp.is_constant)
-                    snprintf(tempbuf, sizeof(tempbuf), "%ld", kv->temp.int_value);
-                else if (val.is_constant)
-                    snprintf(tempbuf, sizeof(tempbuf), "%ld", val.int_value);
+                {
+                    if (kv->temp.type == SEM_TYPE_CHAR)
+                        snprintf(tempbuf, sizeof(tempbuf), "%c", (char)kv->temp.int_value);
+                    else
+                        snprintf(tempbuf, sizeof(tempbuf), "%ld", kv->temp.int_value);
+                }
                 else
-                    snprintf(tempbuf, sizeof(tempbuf), "0");
-            } else {
-                if (val.is_constant)
-                    snprintf(tempbuf, sizeof(tempbuf), "%ld", val.int_value);
+                {
+                    if (val.type == SEM_TYPE_CHAR)
+                        snprintf(tempbuf, sizeof(tempbuf), "%c", (char)val.int_value);
+                    else
+                        snprintf(tempbuf, sizeof(tempbuf), "%ld", val.is_constant ? val.int_value : 0);
+                }
+            }
+            else
+            {
+                if (val.type == SEM_TYPE_CHAR)
+                    snprintf(tempbuf, sizeof(tempbuf), "%c", (char)val.int_value);
                 else
-                    snprintf(tempbuf, sizeof(tempbuf), "0");
+                    snprintf(tempbuf, sizeof(tempbuf), "%ld", val.is_constant ? val.int_value : 0);
             }
         }
 
@@ -614,7 +630,9 @@ static void handle_print(ASTNode *print_node)
     }
 
     buffer_print("\n");
+    sem_inside_print = 0; // End print context
 }
+
 
 
 
