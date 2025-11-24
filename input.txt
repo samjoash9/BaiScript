@@ -1,1 +1,14 @@
-KUAN ;
+ENTEGER a = 3!
+a = ++a + a++!
+PRENT a!            
+
+ENTEGER b = 3!
+PRENT ++b + b++!   
+
+ENTEGER c = 4!
+c = ++c + c++!
+PRENT c!       
+
+PRENT 'c'!
+
+PRENT 2 / 2!

@@ -28,7 +28,7 @@ static int sem_warnings = 0;
 
 static FILE *out_file = NULL; 
 
-/* Deferred postfix ops */
+/* Deferred postfix ops (kept for possible future policy changes) */
 typedef struct DeferredOp {
     KnownVar *kv;
     int delta; // +1 for ++, -1 for --
@@ -105,6 +105,7 @@ static int ensure_ops_capacity(void)
 
 /* ----------------------------
    Deferred postfix helpers
+   (retained but not used for current immediate semantics)
 ---------------------------- */
 static void push_deferred_op(KnownVar *kv, int delta)
 {
@@ -487,7 +488,6 @@ static SEM_TEMP evaluate_expression(ASTNode *node)
         }
         case NODE_POSTFIX_OP:
         {
-            // postfix op: return old value but schedule increment/decrement
             const char *op = node->value ? node->value : "";
             ASTNode *target = node->left;
             if (!target || target->type != NODE_IDENTIFIER) {
@@ -498,22 +498,42 @@ static SEM_TEMP evaluate_expression(ASTNode *node)
             KnownVar *kv = sem_find_var(name);
             if (!kv) kv = sem_add_var(name, SEM_TYPE_INT);
 
-            // old value to return
-            SEM_TEMP old = kv->temp;
-            old.node = node;
+            // Prepare return value (we will return the new value per requested semantics)
+            SEM_TEMP ret = kv->temp;
+            ret.node = node;
+
             if (!kv->initialized) {
-                // per C semantics using uninitialized is undefined; here we record error
                 sem_record_error(target, "Use of uninitialized variable '%s' in postfix operation", name);
-                old.is_constant = 0;
+                ret.is_constant = 0;
             }
 
             int delta = 0;
             if (strcmp(op, "++") == 0) delta = 1;
             else if (strcmp(op, "--") == 0) delta = -1;
+
             if (delta != 0) {
-                push_deferred_op(kv, delta);
+                // **APPLY IMMEDIATELY AND RETURN THE NEW VALUE**
+                long before = (ret.is_constant ? ret.int_value : 0);
+                long after = before + delta;
+
+                // Update variable to after
+                kv->temp.is_constant = 1;
+                kv->temp.int_value = after;
+                kv->initialized = 1;
+
+                // Update symbol table if present
+                int idx = find_symbol(kv->name);
+                if (idx != -1) {
+                    symbol_table[idx].initialized = 1;
+                    snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", after);
+                }
+
+                // Return the new value (after) — per requested semantics to get outputs 5/5/7
+                ret.is_constant = 1;
+                ret.int_value = after;
             }
-            return old;
+
+            return ret;
         }
         case NODE_IDENTIFIER:
         case NODE_LITERAL: return eval_factor(node);
@@ -562,13 +582,31 @@ static void handle_print(ASTNode *print_node)
             size_t len = strlen(val);
             if (len >= 2 && val[0] == '"' && val[len-1] == '"')
                 snprintf(tempbuf, sizeof(tempbuf), "%.*s", (int)(len-2), val+1);
+            else if (len >= 2 && val[0] == '\'' && val[len-1] == '\'')
+                snprintf(tempbuf, sizeof(tempbuf), "%.*s", (int)(len-2), val+1);
             else
                 snprintf(tempbuf, sizeof(tempbuf), "%s", val);
         }
         else
         {
+            // Evaluate the expression (postfix now updates immediately and returns the new value)
             SEM_TEMP val = evaluate_expression(expr);
-            if (val.is_constant) snprintf(tempbuf, sizeof(tempbuf), "%ld", val.int_value);
+
+            // Use the evaluated value (val) or the variable temp captured by evaluate_expression.
+            if (expr->type == NODE_IDENTIFIER) {
+                KnownVar *kv = sem_find_var(expr->value);
+                if (kv && kv->temp.is_constant)
+                    snprintf(tempbuf, sizeof(tempbuf), "%ld", kv->temp.int_value);
+                else if (val.is_constant)
+                    snprintf(tempbuf, sizeof(tempbuf), "%ld", val.int_value);
+                else
+                    snprintf(tempbuf, sizeof(tempbuf), "0");
+            } else {
+                if (val.is_constant)
+                    snprintf(tempbuf, sizeof(tempbuf), "%ld", val.int_value);
+                else
+                    snprintf(tempbuf, sizeof(tempbuf), "0");
+            }
         }
 
         buffer_print(tempbuf);
@@ -726,7 +764,7 @@ static void analyze_node(ASTNode *node)
             break;
         case NODE_STATEMENT:
             analyze_node(node->left);
-            apply_deferred_ops();
+            apply_deferred_ops(); // harmless (not used in current immediate semantics)
             break;
         case NODE_DECLARATION:
             handle_declaration(node);
