@@ -17,6 +17,15 @@ extern ASTNode *root;
 int parse_failed = 0;
 int sem_errors = 0;
 
+void write_error_file(const char *filename, const char *msg) {
+    FILE *f = fopen(filename, "w");
+    if (f) {
+        fprintf(f, "%s\n", msg);
+        fclose(f);
+    }
+}
+
+
 int main()
 {
     // === STEP 0: OPEN SOURCE FILE ===
@@ -37,6 +46,9 @@ int main()
         print_ast(root, 0);
     } else {
         printf("[PARSE] Rejected\n");
+        write_error_file("output_assembly.txt", "No assembly generated due to parse errors.");
+        write_error_file("output_machine.txt", "No machine code generated due to parse errors.");
+        write_error_file("output_tac.txt", "No TAC generated due to parse errors.");
     }
 
     printf("\n=== BaiScript IS PARSED! ===\n");
@@ -64,6 +76,7 @@ int main()
 
     if (sem_errors > 0) {
         printf("[MAIN] Skipping intermediate code generation due to semantic errors.\n");
+        write_error_file("output_tac.txt", "No TAC generated due to semantic errors.");
     } else if (result == 0 && !parse_failed) {
         generate_intermediate_code(root);
     } else {
@@ -77,6 +90,7 @@ int main()
 
     if (sem_errors > 0) {
         printf("[MAIN] Skipping target code generation due to semantic errors.\n");
+        write_error_file("output_assembly.txt", "No assembly generated due to semantic errors.");
     } else if (result == 0 && !parse_failed) {
         generate_target_code();
     } else {
@@ -90,6 +104,7 @@ int main()
 
     if (sem_errors > 0) {
         printf("[MAIN] Skipping machine code generation due to semantic errors.\n");
+        write_error_file("output_machine.txt", "No machine code generated due to semantic errors.");
     } else if (result == 0 && !parse_failed) {
         generate_machine_code();
     } else {

@@ -1,17 +1,10 @@
-ENTEGER a = 1!
-a += 10!
-a = a - 'A'!
-CHAROT b!
-CHAROT c!
-CHAROT d!
+ENTEGER a = (3 + 5 * (2 - 8 / (1 + 1))) - ((4 * 2) / (1 + 1)) + (7 - 3) * (2 + 3 * (1 + 1)) - (6 - 2 * (3 - 1))!
 
+PRENT "the answer is", a!
 
-PRENT a, " hehe ", " + ", 67!
+PRENT "the answer is", a!
 
-a = a + 12!
-PRENT a, " hehe ", " + ", 67!
+KUAN b!
+PRENT "the answer is", b!
 
-PRENT 1/0!
-PRENT b, " hehe ", " + ", 67!
-PRENT c + 1, " hehe ", " + ", 67!
-PRENT d, " hehe ", " + ", 67!
+PRENT 1+2, "Hello", c!

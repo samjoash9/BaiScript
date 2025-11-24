@@ -27,6 +27,9 @@ static KnownVar *known_vars_head = NULL;
 static int sem_errors = 0;
 static int sem_warnings = 0;
 
+static FILE *sem_out = NULL;
+static FILE *print_out = NULL; 
+
 /* ----------------------------
    Helpers: error/warning
    ---------------------------- */
@@ -34,28 +37,57 @@ static int sem_warnings = 0;
 static void sem_record_error(ASTNode *node, const char *fmt, ...)
 {
     sem_errors++;
+
     fprintf(stderr, "[SEM ERROR] ");
-    if (node) fprintf(stderr, "(node='%s') ", node->value ? node->value : "NULL");
+    if (sem_out) fprintf(sem_out, "[SEM ERROR] ");
+
     va_list ap;
     va_start(ap, fmt);
-    vfprintf(stderr, fmt, ap);
+    vfprintf(stderr, fmt, ap);        
+    if (sem_out) vfprintf(sem_out, fmt, ap); 
     va_end(ap);
-    if (node) fprintf(stderr, " [line:%d]", node->line);
+
+    if (node) {
+        fprintf(stderr, " [line:%d]", node->line);
+        if (sem_out) fprintf(sem_out, " [line:%d]", node->line);
+    }
+
     fprintf(stderr, "\n");
+    if (sem_out) fprintf(sem_out, "\n");
 }
+
+
 
 static void sem_record_warning(ASTNode *node, const char *fmt, ...)
 {
     sem_warnings++;
+
     fprintf(stderr, "[SEM WARNING] ");
-    if (node) fprintf(stderr, "(node='%s') ", node->value ? node->value : "NULL");
+    if (sem_out) fprintf(sem_out, "[SEM WARNING] ");
+
     va_list ap;
+
+    // First print to stderr
     va_start(ap, fmt);
     vfprintf(stderr, fmt, ap);
     va_end(ap);
-    if (node) fprintf(stderr, " [line:%d]", node->line);
+
+    // Then restart the va_list and print to file
+    if (sem_out) {
+        va_start(ap, fmt);   // <-- REQUIRED
+        vfprintf(sem_out, fmt, ap);
+        va_end(ap);
+    }
+
+    if (node) {
+        fprintf(stderr, " [line:%d]", node->line);
+        if (sem_out) fprintf(sem_out, " [line:%d]", node->line);
+    }
+
     fprintf(stderr, "\n");
+    if (sem_out) fprintf(sem_out, "\n");
 }
+
 
 /* ----------------------------
    Dynamic arrays helpers
@@ -103,10 +135,13 @@ SEM_TEMP sem_new_temp(SEM_TYPE type)
     t.type = type;
     t.is_constant = 0;
     t.int_value = 0;
-    t.node = NULL;
+    // Always assign a dummy node if none exists to preserve line info
+    t.node = (ASTNode*)malloc(sizeof(ASTNode));
+    if (t.node) { t.node->line = 0; t.node->type = NODE_UNKNOWN; t.node->value = NULL; }
     sem_temps[sem_temps_count++] = t;
     return t;
 }
+
 
 KnownVar* sem_find_var(const char *name)
 {
@@ -125,6 +160,11 @@ KnownVar* sem_add_var(const char *name, SEM_TYPE type)
     if (!k) return NULL;
     k->name = strdup(name);
     k->temp = sem_new_temp(type);
+    // Always ensure the temp has a node
+    if (!k->temp.node) {
+        k->temp.node = (ASTNode*)malloc(sizeof(ASTNode));
+        if (k->temp.node) { k->temp.node->line = 0; k->temp.node->type = NODE_UNKNOWN; k->temp.node->value = NULL; }
+    }
     k->initialized = 0;
     k->used = 0;
     k->next = known_vars_head;
@@ -360,6 +400,74 @@ static SEM_TEMP evaluate_expression(ASTNode *node)
 }
 
 /* ----------------------------
+   Handle print statements
+   ---------------------------- */
+static void handle_print(ASTNode *print_node)
+{
+    if (!print_node) return;
+
+    static FILE *print_out = NULL;
+    if (!print_out) {
+        print_out = fopen("output_print.txt", "w");
+        if (!print_out) fprintf(stderr, "[SEM] Failed to open output_print.txt\n");
+    }
+
+    ASTNode *item = print_node->left; // PRINT_LIST or PRINT_ITEM
+
+    while (item)
+    {
+        ASTNode *expr = item->left ? item->left : item;
+
+        if (expr->type == NODE_LITERAL)
+        {
+            const char *val = expr->value;
+            size_t len = strlen(val);
+            char buffer[1024]; // adjust size if needed
+
+            if (len >= 2 && val[0] == '"' && val[len-1] == '"') {
+                strncpy(buffer, val + 1, len - 2); // copy without quotes
+                buffer[len - 2] = '\0';
+            } else {
+                strncpy(buffer, val, sizeof(buffer));
+                buffer[sizeof(buffer)-1] = '\0';
+            }
+
+            fprintf(print_out, "%s", buffer);
+            printf("%s", buffer);
+        }
+        else if (expr->type == NODE_IDENTIFIER)
+        {
+            SEM_TEMP val = eval_factor(expr);  // ← this marks KnownVar->used correctly
+
+            if (val.is_constant)
+            {
+                fprintf(print_out, "%ld", val.int_value);
+                printf("%ld", val.int_value);
+            }
+        }
+        else
+        {
+            SEM_TEMP val = evaluate_expression(expr);
+            if (val.is_constant)
+            {
+                fprintf(print_out, "%ld", val.int_value);
+                printf("%ld", val.int_value);
+            }
+        }
+
+        item = item->right; // next PRINT_ITEM
+
+        // Add a space between items if there are more
+        if (item) { fprintf(print_out, " "); printf(" "); }
+    }
+
+    fprintf(print_out, "\n");
+    printf("\n");
+}
+
+
+
+/* ----------------------------
    Declaration & assignment
    ---------------------------- */
 
@@ -384,19 +492,19 @@ static void handle_declaration(ASTNode *decl_node)
             {
                 kv = sem_add_var(name, dtype);
 
+                /* Attach declaration AST node for correct warning line */
+                kv->temp.node = decls;
+
                 /* Mark default initialization */
                 kv->initialized = 1;
                 kv->temp.is_constant = 1;
-                kv->temp.int_value = dtype == SEM_TYPE_CHAR ? 0 : 0;
+                kv->temp.int_value = 0;
 
                 int idx = find_symbol(name);
                 if (idx != -1)
                 {
                     symbol_table[idx].initialized = 1;
-                    if (dtype == SEM_TYPE_CHAR)
-                        symbol_table[idx].value_str[0] = '\0';
-                    else
-                    snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", kv->temp.int_value);
+                    symbol_table[idx].value_str[0] = '\0';
                 }
             }
         }
@@ -412,6 +520,10 @@ static void handle_declaration(ASTNode *decl_node)
             else
             {
                 kv = sem_add_var(name, dtype);
+
+                /* Attach declaration AST node for correct warning line */
+                kv->temp.node = idnode;
+
                 SEM_TEMP val = evaluate_expression(init_expr);
 
                 kv->initialized = 1;
@@ -426,6 +538,7 @@ static void handle_declaration(ASTNode *decl_node)
                 }
             }
         }
+
         decls = decls->right;
     }
 }
@@ -468,11 +581,22 @@ static void analyze_node(ASTNode *node)
             analyze_node(node->left);
             analyze_node(node->right);
             break;
-        case NODE_STATEMENT: analyze_node(node->left); break;
-        case NODE_DECLARATION: handle_declaration(node); break;
-        case NODE_ASSIGNMENT: handle_assignment(node); break;
-        case NODE_PRINTING: analyze_node(node->left); break;
-        default: evaluate_expression(node); break;
+        case NODE_STATEMENT:
+            analyze_node(node->left);
+            break;
+        case NODE_DECLARATION:
+            handle_declaration(node);
+            break;
+        case NODE_ASSIGNMENT:
+            handle_assignment(node);
+            break;
+        case NODE_PRINTING:
+        case NODE_PRINT_ITEM:
+            handle_print(node);
+            break;
+        default:
+            evaluate_expression(node);
+            break;
     }
 }
 
@@ -483,8 +607,12 @@ static void analyze_node(ASTNode *node)
 static void check_unused_variables(void)
 {
     for (KnownVar *k = known_vars_head; k; k = k->next)
+    {
+        // Always pass a valid node
+        ASTNode *node = k->temp.node;
         if (!k->used)
-            sem_record_warning(k->temp.node ? k->temp.node : NULL, "Variable '%s' declared but never used", k->name);
+            sem_record_warning(node, "Variable '%s' declared but never used", k->name);
+    }
 }
 
 /* ----------------------------
@@ -493,6 +621,12 @@ static void check_unused_variables(void)
 
 int semantic_analyzer(void)
 {
+
+    // Always overwrite old content (not append)
+    sem_out = fopen("semantic_error.txt", "w");
+    if (!sem_out)
+        fprintf(stderr, "[SEM] Failed to open semantic_error.txt\n");
+
     sem_errors = 0; sem_warnings = 0;
     sem_next_temp_id = 1;
     sem_temps_count = 0; sem_ops_count = 0;
@@ -507,6 +641,18 @@ int semantic_analyzer(void)
     check_unused_variables();
 
     printf("[SEM] Analysis completed: %d semantic error(s), %d warning(s)\n", sem_errors, sem_warnings);
+    fprintf(sem_out, "[SEM] Analysis completed: %d semantic error(s), %d warning(s)\n", sem_errors, sem_warnings);
+    
+    if (sem_out) {
+        fclose(sem_out);
+        sem_out = NULL;
+    }
+
+    if (print_out) {
+        fclose(print_out);
+        print_out = NULL;
+    }
+
     return sem_errors;
 }
 
