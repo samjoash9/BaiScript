@@ -1,7 +1,15 @@
 .data
-a: .word64 0
+b: .word64 0
 
 .code
-; a = 'a'
-daddiu r1, r0, 97
-sd r1, a(r0)
+; temp0 = b INIT_DECL 2
+ld r2, b(r0)
+daddiu r3, r0, 2
+
+; INIT_DECL = temp0
+sd r1, INIT_DECL(r0)
+
+; b = 2
+daddiu r2, r0, 2
+sd r2, b(r0)
+
