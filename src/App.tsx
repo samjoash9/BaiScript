@@ -75,14 +75,14 @@ export default function App() {
   const handleImport = () => {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = ".txt,.bs"; // Accept .txt or your custom extension
+    input.accept = ".txt,.bs";
     input.onchange = (e: any) => {
       const file = e.target.files[0];
       if (!file) return;
 
       const reader = new FileReader();
       reader.onload = () => {
-        setSourceCode(reader.result as string); // Load into the editor
+        setSourceCode(reader.result as string);
       };
       reader.readAsText(file);
     };
@@ -105,18 +105,19 @@ export default function App() {
       >
         <div className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-lg 
+            {/* Logo: static, always dark background with white icon */}
+            <div className="flex items-center justify-center w-10 h-10 rounded-lg
                   bg-gradient-to-br from-gray-800 to-gray-900 shadow-md">
-              <Code2 className="w-6 h-6 text-white" />  {/* stays white */}
+              <Code2 className="w-6 h-6 text-white" />
             </div>
+
             <div>
-              <h1 className="text-xl">BaiScript IDE</h1>
+              <h1 className="text-xl text-white">BaiScript IDE</h1>
               <p className="text-sm text-gray-400">
                 Multi-stage Compiler Environment
               </p>
             </div>
           </div>
-
 
           <div className="flex items-center gap-3" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
             <button
@@ -163,7 +164,6 @@ export default function App() {
       </header>
 
       <Toolbar onImport={handleImport} theme={theme} />
-
 
       {/* Main Content Grid */}
       <main className="grid grid-cols-2 grid-rows-2 gap-4 p-4 h-[calc(100vh-140px)]">
