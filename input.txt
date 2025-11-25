@@ -1,9 +1,1 @@
 ENTEGER a!
-
-ENTEGER b, c, d!
-
-ENTEGER e = 1, f = 2!
-
-a =1!
-
-a = ++a + a++!
