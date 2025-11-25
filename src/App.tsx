@@ -58,15 +58,10 @@ export default function App() {
     if (window.electronAPI) {
       try {
         const result = await window.electronAPI.runCompiler(sourceCode);
-        if (result.success) {
-          setOutput(result.outputs?.print ?? result.stdout ?? 'No output generated.');
-          setTargetCode(result.outputs?.assembly ?? '');
-          setMachineCode(result.outputs?.machine ?? '');
-        } else {
-          setOutput(
-            `Error: Compilation failed\nExit code: ${result.exitCode}\n${result.stderr || result.error || 'Unknown error'}`
-          );
-        }
+        setOutput(result.outputs?.print ?? result.stdout ?? 'No output generated.');
+        setTargetCode(result.outputs?.assembly ?? '');
+        setMachineCode(result.outputs?.machine ?? '');
+
       } catch (error: any) {
         setOutput(`Error: ${error.message || 'Failed to run compiler'}`);
       } finally {

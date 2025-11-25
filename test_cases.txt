@@ -1,22 +1,24 @@
 ENTEGER a = 1!
 
-ENTEGER a!
+ENTEGER b!
 
-CHAROT a!
+CHAROT c!
 
-CHAROT a = 'a'!
+CHAROT d = 'a'!
 
-ENTEGER ((((a))))! 
+ENTEGER ((((e))))! 
 
-ENTEGER (a) = 1!
+ENTEGER (f) = 1!
 
-ENTEGER (((a))) = 1!
+ENTEGER (((g))) = 1!
 
-CHAROT (((((b)))))!
+CHAROT (((((h)))))!
 
-CHAROT ((((b)))) = 'a'!
+CHAROT ((((i)))) = 'a'!
 
-ENTEGER a = 1!
-ENTEGER a = ++a + a++!
+ENTEGER j = 1!
+ENTEGER k = ++a + a++!
 
-ENTEGER a = (1 + 2) / (3 * 2)!
+ENTEGER l = (1 + 2) / (3 * 2)!
+
+KUAN m = 'a' + 2!

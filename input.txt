@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-ENTEGER a = 'a'!
-=======
-ENTEGER f = 'B'!
-PRENT 'A' - f!
->>>>>>> 1d9bceeaba219a7491cc672e9e68999fad794c46
+KUAN a = 'a' + 'b'!
+
+PRENT a - 'b'!
