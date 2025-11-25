@@ -70,10 +70,13 @@ Register *get_available_register()
 
 int is_tac_temporary(char *tac)
 {
-    if (!tac) return 0;
-    if (strncmp(tac, "temp", 4) != 0) return 0;
+    if (!tac)
+        return 0;
+    if (strncmp(tac, "temp", 4) != 0)
+        return 0;
     for (int i = 4; tac[i] != '\0'; i++)
-        if (!isdigit((unsigned char)tac[i])) return 0;
+        if (!isdigit((unsigned char)tac[i]))
+            return 0;
     return 1;
 }
 
@@ -89,13 +92,17 @@ Register *find_temp_reg(char *temp)
 
 int is_digit(char *value)
 {
-    if (!value || !*value) return 0;
+    if (!value || !*value)
+        return 0;
     char *v = value;
-    if (*v == '-') v++;
-    if (!*v) return 0;
+    if (*v == '-')
+        v++;
+    if (!*v)
+        return 0;
     while (*v)
     {
-        if (!isdigit(*v)) return 0;
+        if (!isdigit(*v))
+            return 0;
         v++;
     }
     return 1;
@@ -104,7 +111,8 @@ int is_digit(char *value)
 // === CHAROT CONVERSION ===
 void convert_char_to_int(char *arg)
 {
-    if (!arg || arg[0] == '\0') return;
+    if (!arg || arg[0] == '\0')
+        return;
 
     // literal char 'a'
     if (arg[0] == '\'' && arg[2] == '\'' && arg[3] == '\0')
@@ -131,7 +139,8 @@ void generate_data_section()
     add_assembly_line(".data\n");
     for (int i = 0; i < symbol_count; i++)
     {
-        if (is_tac_temporary(symbol_table[i].name)) continue;
+        if (is_tac_temporary(symbol_table[i].name))
+            continue;
         add_assembly_line("%s: .word64 0\n", symbol_table[i].name);
         add_to_data_storage(symbol_table[i].name);
     }
@@ -167,15 +176,29 @@ void perform_operation(char *result, char *arg1, char *op, char *arg2, Register 
     if (!is_for_temporary)
     {
         add_assembly_line("sd %s, %s(r0)\n", reg3->name, result);
-        if (reg1) { reg1->used = 0; reg1->assigned_temp[0] = '\0'; }
-        if (reg2) { reg2->used = 0; reg2->assigned_temp[0] = '\0'; }
-        if (reg3) { reg3->used = 0; reg3->assigned_temp[0] = '\0'; }
+        if (reg1)
+        {
+            reg1->used = 0;
+            reg1->assigned_temp[0] = '\0';
+        }
+        if (reg2)
+        {
+            reg2->used = 0;
+            reg2->assigned_temp[0] = '\0';
+        }
+        if (reg3)
+        {
+            reg3->used = 0;
+            reg3->assigned_temp[0] = '\0';
+        }
     }
     else
     {
         strcpy(reg3->assigned_temp, result);
-        if (reg1) reg1->used = 0;
-        if (reg2) reg2->used = 0;
+        if (reg1)
+            reg1->used = 0;
+        if (reg2)
+            reg2->used = 0;
     }
 }
 
@@ -197,7 +220,8 @@ void generate_code_section()
         {
             // temp result, assign reg3
             reg3 = find_temp_reg(ins.result);
-            if (!reg3) reg3 = get_available_register();
+            if (!reg3)
+                reg3 = get_available_register();
             reg3->used = 1;
             strcpy(reg3->assigned_temp, ins.result);
         }
@@ -220,7 +244,12 @@ void generate_code_section()
             else if (is_tac_temporary(ins.arg1))
             {
                 reg1 = find_temp_reg(ins.arg1);
-                if (!reg1) { reg1 = get_available_register(); reg1->used = 1; strcpy(reg1->assigned_temp, ins.arg1); }
+                if (!reg1)
+                {
+                    reg1 = get_available_register();
+                    reg1->used = 1;
+                    strcpy(reg1->assigned_temp, ins.arg1);
+                }
             }
             else
             {
@@ -239,7 +268,12 @@ void generate_code_section()
             else if (is_tac_temporary(ins.arg2))
             {
                 reg2 = find_temp_reg(ins.arg2);
-                if (!reg2) { reg2 = get_available_register(); reg2->used = 1; strcpy(reg2->assigned_temp, ins.arg2); }
+                if (!reg2)
+                {
+                    reg2 = get_available_register();
+                    reg2->used = 1;
+                    strcpy(reg2->assigned_temp, ins.arg2);
+                }
             }
             else
             {
@@ -261,7 +295,12 @@ void generate_code_section()
             else if (is_tac_temporary(ins.arg1))
             {
                 reg1 = find_temp_reg(ins.arg1);
-                if (!reg1) { reg1 = get_available_register(); reg1->used = 1; strcpy(reg1->assigned_temp, ins.arg1); }
+                if (!reg1)
+                {
+                    reg1 = get_available_register();
+                    reg1->used = 1;
+                    strcpy(reg1->assigned_temp, ins.arg1);
+                }
             }
             else
             {
@@ -282,8 +321,10 @@ void generate_code_section()
             reg1->used = 0;
         }
 
-        if (reg2) reg2->used = 0;
-        if (reg3 && !is_tac_temporary(ins.result)) reg3->used = 0;
+        if (reg2)
+            reg2->used = 0;
+        if (reg3 && !is_tac_temporary(ins.result))
+            reg3->used = 0;
 
         add_assembly_line("\n");
     }
@@ -293,7 +334,11 @@ void generate_code_section()
 void output_assembly_file()
 {
     FILE *file = fopen("output_assembly.txt", "w");
-    if (!file) { printf("Error creating output file\n"); return; }
+    if (!file)
+    {
+        printf("Error creating output file\n");
+        return;
+    }
     for (int i = 0; i < assembly_code_count; i++)
         fprintf(file, "%s", assembly_code[i].assembly);
     fclose(file);

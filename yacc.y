@@ -223,4 +223,3 @@ void yyerror(const char *s) {
     }
     parse_failed = 1;
 }
-

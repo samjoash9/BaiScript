@@ -34,7 +34,11 @@ static char *newTemp()
 static void emit(const char *result, const char *arg1, const char *op, const char *arg2)
 {
     TACInstruction *tmp = realloc(code, sizeof(TACInstruction) * (codeCount + 1));
-    if (!tmp) { fprintf(stderr, "Memory allocation failed in emit()\n"); exit(1); }
+    if (!tmp)
+    {
+        fprintf(stderr, "Memory allocation failed in emit()\n");
+        exit(1);
+    }
     code = tmp;
 
     snprintf(code[codeCount].result, sizeof(code[codeCount].result), "%s", result ? result : "");
@@ -47,10 +51,12 @@ static void emit(const char *result, const char *arg1, const char *op, const cha
 // === Expression Generator with Correct Prefix/Postfix ===
 static char *generateExpression(ASTNode *node)
 {
-    if (!node) return NULL;
+    if (!node)
+        return NULL;
 
     // Leaf node (variable or literal)
-    if (!node->left && !node->right) return strdup(node->value ? node->value : "");
+    if (!node->left && !node->right)
+        return strdup(node->value ? node->value : "");
 
     // Assignment
     if (node->type == NODE_ASSIGNMENT && node->left && node->right)
@@ -163,9 +169,10 @@ static void generateDeclarationList(ASTNode *node)
 // === AST Walker / Code Generator ===
 static void generateCode(ASTNode *node)
 {
-    if (!node) return;
+    if (!node)
+        return;
 
-    switch(node->type)
+    switch (node->type)
     {
         case NODE_START: generateCode(node->left); break;
         case NODE_STATEMENT_LIST:
@@ -196,19 +203,33 @@ static void generateCode(ASTNode *node)
 // === Optimization: remove empty-result TAC ===
 static void removeRedundantTemporaries()
 {
-    if (codeCount == 0) { optimizedCode = NULL; optimizedCount = 0; return; }
+    if (codeCount == 0)
+    {
+        optimizedCode = NULL;
+        optimizedCount = 0;
+        return;
+    }
     TACInstruction *tmp = malloc(sizeof(TACInstruction) * codeCount);
-    if(!tmp){ fprintf(stderr,"Out of memory\n"); exit(1);}
+    if (!tmp)
+    {
+        fprintf(stderr, "Out of memory\n");
+        exit(1);
+    }
     memcpy(tmp, code, sizeof(TACInstruction) * codeCount);
 
     int j = 0;
-    for(int i = 0; i < codeCount; i++)
+    for (int i = 0; i < codeCount; i++)
     {
-        if(strlen(tmp[i].result) > 0) tmp[j++] = tmp[i];
+        if (strlen(tmp[i].result) > 0)
+            tmp[j++] = tmp[i];
     }
 
     optimizedCode = malloc(sizeof(TACInstruction) * j);
-    if(!optimizedCode){ fprintf(stderr,"Out of memory\n"); exit(1);}
+    if (!optimizedCode)
+    {
+        fprintf(stderr, "Out of memory\n");
+        exit(1);
+    }
     memcpy(optimizedCode, tmp, sizeof(TACInstruction) * j);
     optimizedCount = j;
     free(tmp);
@@ -218,12 +239,12 @@ static void removeRedundantTemporaries()
 static void displayTAC()
 {
     printf("===== INTERMEDIATE CODE (TAC) =====\n");
-    for(int i = 0; i < codeCount; i++)
+    for (int i = 0; i < codeCount; i++)
     {
         TACInstruction *inst = &code[i];
-        if(strcmp(inst->op,"=") == 0 && strlen(inst->arg2) == 0)
+        if (strcmp(inst->op, "=") == 0 && strlen(inst->arg2) == 0)
             printf("%s = %s\n", inst->result, inst->arg1);
-        else if(strlen(inst->op) == 0)
+        else if (strlen(inst->op) == 0)
             printf("%s = %s\n", inst->result, inst->arg1);
         else
             printf("%s = %s %s %s\n", inst->result, inst->arg1, inst->op, inst->arg2);
@@ -234,12 +255,12 @@ static void displayTAC()
 static void displayOptimizedTAC()
 {
     printf("===== OPTIMIZED CODE =====\n");
-    for(int i = 0; i < optimizedCount; i++)
+    for (int i = 0; i < optimizedCount; i++)
     {
         TACInstruction *inst = &optimizedCode[i];
-        if(strcmp(inst->op,"=") == 0 && strlen(inst->arg2) == 0)
+        if (strcmp(inst->op, "=") == 0 && strlen(inst->arg2) == 0)
             printf("%s = %s\n", inst->result, inst->arg1);
-        else if(strlen(inst->op) == 0)
+        else if (strlen(inst->op) == 0)
             printf("%s = %s\n", inst->result, inst->arg1);
         else
             printf("%s = %s %s %s\n", inst->result, inst->arg1, inst->op, inst->arg2);
@@ -250,12 +271,18 @@ static void displayOptimizedTAC()
 // === Public Interface ===
 void generate_intermediate_code(ASTNode *root)
 {
-    if(code) free(code);
-    if(optimizedCode) free(optimizedCode);
-    code = NULL; optimizedCode = NULL;
-    codeCount = 0; optimizedCount = 0; tempCount = 0;
+    if (code)
+        free(code);
+    if (optimizedCode)
+        free(optimizedCode);
+    code = NULL;
+    optimizedCode = NULL;
+    codeCount = 0;
+    optimizedCount = 0;
+    tempCount = 0;
 
-    if(root) generateCode(root);
+    if (root)
+        generateCode(root);
 
     displayTAC();
     removeRedundantTemporaries();
