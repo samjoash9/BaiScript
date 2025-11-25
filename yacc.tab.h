@@ -80,8 +80,8 @@ typedef union YYSTYPE
 /* Line 2058 of yacc.c  */
 #line 17 "yacc.y"
 
-    char *str;       /* for token text */
-    ASTNode *node;   /* for AST nodes */
+    char *str;
+    ASTNode *node;
 
 
 /* Line 2058 of yacc.c  */

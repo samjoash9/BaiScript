@@ -14,7 +14,8 @@ static int ensure_symbol_capacity(void)
     {
         size_t new_cap = (symbol_capacity == 0) ? 16 : symbol_capacity * 2;
         SymbolEntry *new_table = realloc(symbol_table, new_cap * sizeof(SymbolEntry));
-        if (!new_table) return 0; // failed
+        if (!new_table)
+            return 0; // failed
         symbol_table = new_table;
         symbol_capacity = new_cap;
     }
@@ -24,22 +25,23 @@ static int ensure_symbol_capacity(void)
 /* Add a symbol */
 int add_symbol(const char *name, const char *datatype, int initialized, const char *value_str)
 {
-    if (!ensure_symbol_capacity()) return -1;
+    if (!ensure_symbol_capacity())
+        return -1;
 
-    strncpy(symbol_table[symbol_count].name, name, SYMBOL_NAME_MAX-1);
-    symbol_table[symbol_count].name[SYMBOL_NAME_MAX-1] = '\0';
+    strncpy(symbol_table[symbol_count].name, name, SYMBOL_NAME_MAX - 1);
+    symbol_table[symbol_count].name[SYMBOL_NAME_MAX - 1] = '\0';
 
-    strncpy(symbol_table[symbol_count].datatype, datatype, sizeof(symbol_table[symbol_count].datatype)-1);
-    symbol_table[symbol_count].datatype[sizeof(symbol_table[symbol_count].datatype)-1] = '\0';
+    strncpy(symbol_table[symbol_count].datatype, datatype, sizeof(symbol_table[symbol_count].datatype) - 1);
+    symbol_table[symbol_count].datatype[sizeof(symbol_table[symbol_count].datatype) - 1] = '\0';
 
     symbol_table[symbol_count].initialized = initialized;
 
     if (value_str)
-        strncpy(symbol_table[symbol_count].value_str, value_str, SYMBOL_VALUE_MAX-1);
+        strncpy(symbol_table[symbol_count].value_str, value_str, SYMBOL_VALUE_MAX - 1);
     else
         symbol_table[symbol_count].value_str[0] = '\0';
 
-    symbol_table[symbol_count].value_str[SYMBOL_VALUE_MAX-1] = '\0';
+    symbol_table[symbol_count].value_str[SYMBOL_VALUE_MAX - 1] = '\0';
 
     return symbol_count++;
 }
@@ -81,10 +83,10 @@ void print_symbol_table(void)
     for (size_t i = 0; i < symbol_count; i++)
     {
         printf("%-10s | %-10s | %-10s | %-10s\n",
-            symbol_table[i].name,
-            symbol_table[i].datatype,
-            symbol_table[i].initialized ? "Yes" : "No",
-            symbol_table[i].value_str);
+               symbol_table[i].name,
+               symbol_table[i].datatype,
+               symbol_table[i].initialized ? "Yes" : "No",
+               symbol_table[i].value_str);
     }
     printf("===================================================\n");
 }

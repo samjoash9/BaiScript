@@ -69,13 +69,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include "ast.h"
+#include "symbol_table.h"
 
 int yylex(void);
 extern int parse_failed;
 extern ASTNode *root;
 extern void yyerror(const char *s);
 
-/* Track real line number per input line */
 int lineCount = 1;
 
 /* Line 371 of yacc.c  */
@@ -149,8 +149,8 @@ typedef union YYSTYPE
 /* Line 387 of yacc.c  */
 #line 17 "yacc.y"
 
-    char *str;       /* for token text */
-    ASTNode *node;   /* for AST nodes */
+    char *str;
+    ASTNode *node;
 
 
 /* Line 387 of yacc.c  */
@@ -461,7 +461,7 @@ static const yytype_uint8 yyprhs[] =
 {
        0,     0,     3,     5,     8,     9,    12,    15,    18,    21,
       23,    26,    28,    31,    34,    35,    39,    40,    42,    44,
-      47,    49,    51,    53,    55,    59,    61,    65,    67,    71,
+      47,    49,    51,    53,    55,    59,    63,    65,    67,    71,
       75,    79,    81,    83,    85,    87,    89,    91,    95,    99,
      101,   105,   109,   111,   113,   115,   118,   121,   124,   127,
      130,   131,   133,   135,   137,   139,   141
@@ -476,7 +476,7 @@ static const yytype_int8 yyrhs[] =
       -1,    34,    33,    -1,    -1,    16,    34,    33,    -1,    -1,
       42,    -1,    21,    -1,    36,    37,    -1,     5,    -1,     4,
       -1,     3,    -1,    38,    -1,    38,    16,    37,    -1,    39,
-      -1,    39,    26,    42,    -1,    18,    -1,    14,    39,    15,
+      26,    42,    -1,    39,    -1,    18,    -1,    14,    39,    15,
       -1,    18,    41,    40,    -1,    18,    41,    42,    -1,    26,
       -1,    22,    -1,    23,    -1,    25,    -1,    24,    -1,    43,
       -1,    43,     8,    44,    -1,    43,     9,    44,    -1,    44,
@@ -488,14 +488,14 @@ static const yytype_int8 yyrhs[] =
 };
 
 /* YYRLINE[YYN] -- source line where rule number YYN was defined.  */
-static const yytype_uint8 yyrline[] =
+static const yytype_uint16 yyrline[] =
 {
-       0,    47,    47,    55,    58,    63,    64,    65,    66,    67,
-      68,    69,    74,    79,    82,    86,    89,    93,    94,    99,
-     107,   108,   109,   113,   115,   120,   122,   127,   129,   135,
-     141,   151,   152,   153,   154,   155,   160,   164,   165,   166,
-     170,   171,   172,   176,   177,   181,   182,   183,   184,   188,
-     200,   201,   202,   206,   207,   208,   209
+       0,    47,    47,    57,    63,    68,    69,    70,    71,    72,
+      73,    74,    79,    84,    90,    94,   100,   104,   105,   117,
+     158,   159,   160,   167,   169,   182,   189,   199,   200,   208,
+     214,   223,   224,   225,   226,   227,   230,   233,   234,   235,
+     239,   240,   241,   245,   246,   250,   251,   252,   253,   257,
+     267,   268,   269,   273,   274,   275,   276
 };
 #endif
 
@@ -543,7 +543,7 @@ static const yytype_uint8 yyr2[] =
 {
        0,     2,     1,     2,     0,     2,     2,     2,     2,     1,
        2,     1,     2,     2,     0,     3,     0,     1,     1,     2,
-       1,     1,     1,     1,     3,     1,     3,     1,     3,     3,
+       1,     1,     1,     1,     3,     3,     1,     1,     3,     3,
        3,     1,     1,     1,     1,     1,     1,     3,     3,     1,
        3,     3,     1,     1,     1,     2,     2,     2,     2,     2,
        0,     1,     1,     1,     1,     1,     3
@@ -559,10 +559,10 @@ static const yytype_uint8 yydefact[] =
        0,     0,     0,     0,    36,    39,    42,    43,    44,    50,
       10,    53,    18,    12,    16,    17,    45,    46,    47,    48,
        0,    32,    33,    35,    34,    31,     0,     1,     3,     8,
-       5,     0,    27,    19,    23,    25,     6,     7,     0,     0,
+       5,     0,    27,    19,    23,    26,     6,     7,     0,     0,
        0,     0,    51,    52,    49,     0,    13,    56,    29,    30,
        0,     0,     0,    37,    38,    40,    41,    16,    28,    24,
-      26,    15
+      25,    15
 };
 
 /* YYDEFGOTO[NTERM-NUM].  */
@@ -1448,173 +1448,232 @@ yyreduce:
         case 2:
 /* Line 1792 of yacc.c  */
 #line 48 "yacc.y"
-    {
+    { 
         root = new_node(NODE_START, "START", (yyvsp[(1) - (1)].node), NULL, lineCount);
+        (yyval.node) = root;
     }
     break;
 
   case 3:
 /* Line 1792 of yacc.c  */
-#line 56 "yacc.y"
-    { (yyval.node) = new_node(NODE_STATEMENT_LIST, "STMT_LIST", (yyvsp[(1) - (2)].node), (yyvsp[(2) - (2)].node), lineCount); }
+#line 58 "yacc.y"
+    {
+          ASTNode *head = (yyvsp[(1) - (2)].node);
+          if ((yyvsp[(2) - (2)].node)) head->right = (yyvsp[(2) - (2)].node);
+          (yyval.node) = head;
+      }
     break;
 
   case 4:
 /* Line 1792 of yacc.c  */
-#line 58 "yacc.y"
+#line 63 "yacc.y"
     { (yyval.node) = NULL; }
     break;
 
   case 5:
 /* Line 1792 of yacc.c  */
-#line 63 "yacc.y"
+#line 68 "yacc.y"
     { (yyval.node) = new_node(NODE_STATEMENT, "DECL_STMT", (yyvsp[(1) - (2)].node), NULL, lineCount); }
     break;
 
   case 6:
 /* Line 1792 of yacc.c  */
-#line 64 "yacc.y"
+#line 69 "yacc.y"
     { (yyval.node) = new_node(NODE_STATEMENT, "ASSIGN_STMT", (yyvsp[(1) - (2)].node), NULL, lineCount); }
     break;
 
   case 7:
 /* Line 1792 of yacc.c  */
-#line 65 "yacc.y"
+#line 70 "yacc.y"
     { (yyval.node) = new_node(NODE_STATEMENT, "EXPR_STMT", (yyvsp[(1) - (2)].node), NULL, lineCount); }
     break;
 
   case 8:
 /* Line 1792 of yacc.c  */
-#line 66 "yacc.y"
+#line 71 "yacc.y"
     { (yyval.node) = new_node(NODE_STATEMENT, "PRINT_STMT", (yyvsp[(1) - (2)].node), NULL, lineCount); }
     break;
 
   case 9:
 /* Line 1792 of yacc.c  */
-#line 67 "yacc.y"
+#line 72 "yacc.y"
     { (yyval.node) = new_node(NODE_STATEMENT, "EMPTY!", NULL, NULL, lineCount); }
     break;
 
   case 10:
 /* Line 1792 of yacc.c  */
-#line 68 "yacc.y"
-    { yyerror("Invalid statement"); yyerrok; ++lineCount; islexerror=0; }
+#line 73 "yacc.y"
+    { yyerror("Invalid statement"); yyerrok; ++lineCount; islexerror=0; (yyval.node) = NULL; }
     break;
 
   case 11:
 /* Line 1792 of yacc.c  */
-#line 69 "yacc.y"
-    { ++lineCount; }
+#line 74 "yacc.y"
+    { ++lineCount; (yyval.node) = NULL; }
     break;
 
   case 12:
 /* Line 1792 of yacc.c  */
-#line 75 "yacc.y"
-    { (yyval.node) = new_node(NODE_PRINTING, "PRINT", (yyvsp[(2) - (2)].node), NULL, lineCount); }
+#line 80 "yacc.y"
+    { (yyval.node) = (yyvsp[(2) - (2)].node); }
     break;
 
   case 13:
 /* Line 1792 of yacc.c  */
-#line 80 "yacc.y"
-    { (yyval.node) = new_node(NODE_PRINT_ITEM, "PRINT_LIST", (yyvsp[(1) - (2)].node), (yyvsp[(2) - (2)].node), lineCount); }
+#line 85 "yacc.y"
+    {
+          ASTNode *head = (yyvsp[(1) - (2)].node);
+          if ((yyvsp[(2) - (2)].node)) head->right = (yyvsp[(2) - (2)].node);
+          (yyval.node) = head;
+      }
     break;
 
   case 14:
 /* Line 1792 of yacc.c  */
-#line 82 "yacc.y"
+#line 90 "yacc.y"
     { (yyval.node) = NULL; }
     break;
 
   case 15:
 /* Line 1792 of yacc.c  */
-#line 87 "yacc.y"
-    { (yyval.node) = new_node(NODE_PRINT_ITEM, "PRINT_ITEM", (yyvsp[(2) - (3)].node), (yyvsp[(3) - (3)].node), lineCount); }
+#line 95 "yacc.y"
+    {
+          ASTNode *head = (yyvsp[(2) - (3)].node);
+          if ((yyvsp[(3) - (3)].node)) head->right = (yyvsp[(3) - (3)].node);
+          (yyval.node) = head;
+      }
     break;
 
   case 16:
 /* Line 1792 of yacc.c  */
-#line 89 "yacc.y"
+#line 100 "yacc.y"
     { (yyval.node) = NULL; }
     break;
 
   case 17:
 /* Line 1792 of yacc.c  */
-#line 93 "yacc.y"
+#line 104 "yacc.y"
     { (yyval.node) = (yyvsp[(1) - (1)].node); }
     break;
 
   case 18:
 /* Line 1792 of yacc.c  */
-#line 94 "yacc.y"
+#line 105 "yacc.y"
     { (yyval.node) = new_node(NODE_LITERAL, (yyvsp[(1) - (1)].str), NULL, NULL, lineCount); }
     break;
 
   case 19:
 /* Line 1792 of yacc.c  */
-#line 100 "yacc.y"
+#line 118 "yacc.y"
     {
-        (yyval.node) = new_node(NODE_DECLARATION, (yyvsp[(1) - (2)].node) ? (yyvsp[(1) - (2)].node)->value : "TYPE", (yyvsp[(2) - (2)].node), NULL, lineCount);
-        if ((yyvsp[(1) - (2)].node)) { free((yyvsp[(1) - (2)].node)->value); free((yyvsp[(1) - (2)].node)); }
+        ASTNode *decl_list_out = NULL; /* list of NODE_DECL nodes to attach under NODE_DECLARATION */
+        ASTNode *prev_out = NULL;
+
+        ASTNode *iter = (yyvsp[(2) - (2)].node); /* iterates the list returned by INIT_DECLARATOR_LIST.
+                              Each node is a NODE_DECL whose left child is the initializer (or NULL),
+                              and whose right child is the NEXT declarator in the list. */
+
+        while (iter) {
+            int initialized = (iter->left != NULL) ? 1 : 0;
+
+            /* pick initializer string for symbol table if it's a literal; otherwise empty.
+               We keep it simple and pass empty string for now (as before). */
+            const char *init_val = "";
+
+            /* Add to symbol table: name, datatype, initialized, value-string */
+            add_symbol(iter->value, (yyvsp[(1) - (2)].node)->value, initialized, init_val);
+
+            /* For output AST we create a NODE_DECL node whose left child is the initializer expression */
+            ASTNode *outnode = new_node(NODE_DECL, iter->value, iter->left, NULL, lineCount);
+
+            if (!decl_list_out) decl_list_out = outnode;
+            else prev_out->right = outnode;
+
+            prev_out = outnode;
+
+            iter = iter->right; /* advance along declarator list */
+        }
+
+        /* Final wrapper with datatype as value and decl_list_out as left child */
+        (yyval.node) = new_node(NODE_DECLARATION, (yyvsp[(1) - (2)].node)->value, decl_list_out, NULL, lineCount);
+
+        /* free datatype temp */
+        free((yyvsp[(1) - (2)].node)->value);
+        free((yyvsp[(1) - (2)].node));
     }
     break;
 
   case 20:
 /* Line 1792 of yacc.c  */
-#line 107 "yacc.y"
+#line 158 "yacc.y"
     { (yyval.node) = new_node(NODE_DATATYPE, "CHAROT", NULL, NULL, lineCount); }
     break;
 
   case 21:
 /* Line 1792 of yacc.c  */
-#line 108 "yacc.y"
+#line 159 "yacc.y"
     { (yyval.node) = new_node(NODE_DATATYPE, "ENTEGER", NULL, NULL, lineCount); }
     break;
 
   case 22:
 /* Line 1792 of yacc.c  */
-#line 109 "yacc.y"
+#line 160 "yacc.y"
     { (yyval.node) = new_node(NODE_DATATYPE, "KUAN", NULL, NULL, lineCount); }
     break;
 
   case 23:
 /* Line 1792 of yacc.c  */
-#line 114 "yacc.y"
+#line 168 "yacc.y"
     { (yyval.node) = (yyvsp[(1) - (1)].node); }
     break;
 
   case 24:
 /* Line 1792 of yacc.c  */
-#line 116 "yacc.y"
-    { (yyval.node) = new_node(NODE_DECLARATION, "DECL", (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node), lineCount); }
+#line 170 "yacc.y"
+    {
+          ASTNode *first = (yyvsp[(1) - (3)].node);
+          /* $1 is a NODE_DECL; its right should point to the subsequent list head */
+          first->right = (yyvsp[(3) - (3)].node);
+          (yyval.node) = first;
+      }
     break;
 
   case 25:
 /* Line 1792 of yacc.c  */
-#line 121 "yacc.y"
-    { (yyval.node) = (yyvsp[(1) - (1)].node); }
+#line 183 "yacc.y"
+    {
+          /* DECLARATOR ($1) is a NODE_IDENTIFIER; take its value as the variable name */
+          (yyval.node) = new_node(NODE_DECL, (yyvsp[(1) - (3)].node)->value, (yyvsp[(3) - (3)].node), NULL, lineCount);
+          free((yyvsp[(1) - (3)].node)->value);
+          free((yyvsp[(1) - (3)].node));
+      }
     break;
 
   case 26:
 /* Line 1792 of yacc.c  */
-#line 123 "yacc.y"
-    { (yyval.node) = new_node(NODE_DECLARATION, "INIT_DECL", (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node), lineCount); }
+#line 190 "yacc.y"
+    {
+          (yyval.node) = new_node(NODE_DECL, (yyvsp[(1) - (1)].node)->value, NULL, NULL, lineCount);
+          free((yyvsp[(1) - (1)].node)->value);
+          free((yyvsp[(1) - (1)].node));
+      }
     break;
 
   case 27:
 /* Line 1792 of yacc.c  */
-#line 128 "yacc.y"
+#line 199 "yacc.y"
     { (yyval.node) = new_node(NODE_IDENTIFIER, (yyvsp[(1) - (1)].str), NULL, NULL, lineCount); }
     break;
 
   case 28:
 /* Line 1792 of yacc.c  */
-#line 130 "yacc.y"
+#line 200 "yacc.y"
     { (yyval.node) = (yyvsp[(2) - (3)].node); }
     break;
 
   case 29:
 /* Line 1792 of yacc.c  */
-#line 136 "yacc.y"
+#line 209 "yacc.y"
     {
           ASTNode *id = new_node(NODE_IDENTIFIER, (yyvsp[(1) - (3)].str), NULL, NULL, lineCount);
           (yyval.node) = new_node(NODE_ASSIGNMENT, (yyvsp[(2) - (3)].node)->value, id, (yyvsp[(3) - (3)].node), lineCount);
@@ -1624,7 +1683,7 @@ yyreduce:
 
   case 30:
 /* Line 1792 of yacc.c  */
-#line 142 "yacc.y"
+#line 215 "yacc.y"
     {
           ASTNode *id = new_node(NODE_IDENTIFIER, (yyvsp[(1) - (3)].str), NULL, NULL, lineCount);
           (yyval.node) = new_node(NODE_ASSIGNMENT, (yyvsp[(2) - (3)].node)->value, id, (yyvsp[(3) - (3)].node), lineCount);
@@ -1634,158 +1693,156 @@ yyreduce:
 
   case 31:
 /* Line 1792 of yacc.c  */
-#line 151 "yacc.y"
+#line 223 "yacc.y"
     { (yyval.node) = new_node(NODE_UNKNOWN, (yyvsp[(1) - (1)].str), NULL, NULL, lineCount); }
     break;
 
   case 32:
 /* Line 1792 of yacc.c  */
-#line 152 "yacc.y"
+#line 224 "yacc.y"
     { (yyval.node) = new_node(NODE_UNKNOWN, (yyvsp[(1) - (1)].str), NULL, NULL, lineCount); }
     break;
 
   case 33:
 /* Line 1792 of yacc.c  */
-#line 153 "yacc.y"
+#line 225 "yacc.y"
     { (yyval.node) = new_node(NODE_UNKNOWN, (yyvsp[(1) - (1)].str), NULL, NULL, lineCount); }
     break;
 
   case 34:
 /* Line 1792 of yacc.c  */
-#line 154 "yacc.y"
+#line 226 "yacc.y"
     { (yyval.node) = new_node(NODE_UNKNOWN, (yyvsp[(1) - (1)].str), NULL, NULL, lineCount); }
     break;
 
   case 35:
 /* Line 1792 of yacc.c  */
-#line 155 "yacc.y"
+#line 227 "yacc.y"
     { (yyval.node) = new_node(NODE_UNKNOWN, (yyvsp[(1) - (1)].str), NULL, NULL, lineCount); }
     break;
 
   case 36:
 /* Line 1792 of yacc.c  */
-#line 160 "yacc.y"
+#line 230 "yacc.y"
     { (yyval.node) = (yyvsp[(1) - (1)].node); }
     break;
 
   case 37:
 /* Line 1792 of yacc.c  */
-#line 164 "yacc.y"
+#line 233 "yacc.y"
     { (yyval.node) = new_node(NODE_EXPRESSION, "+", (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node), lineCount); }
     break;
 
   case 38:
 /* Line 1792 of yacc.c  */
-#line 165 "yacc.y"
+#line 234 "yacc.y"
     { (yyval.node) = new_node(NODE_EXPRESSION, "-", (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node), lineCount); }
     break;
 
   case 39:
 /* Line 1792 of yacc.c  */
-#line 166 "yacc.y"
+#line 235 "yacc.y"
     { (yyval.node) = (yyvsp[(1) - (1)].node); }
     break;
 
   case 40:
 /* Line 1792 of yacc.c  */
-#line 170 "yacc.y"
+#line 239 "yacc.y"
     { (yyval.node) = new_node(NODE_TERM, "*", (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node), lineCount); }
     break;
 
   case 41:
 /* Line 1792 of yacc.c  */
-#line 171 "yacc.y"
+#line 240 "yacc.y"
     { (yyval.node) = new_node(NODE_TERM, "/", (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node), lineCount); }
     break;
 
   case 42:
 /* Line 1792 of yacc.c  */
-#line 172 "yacc.y"
+#line 241 "yacc.y"
     { (yyval.node) = (yyvsp[(1) - (1)].node); }
     break;
 
   case 45:
 /* Line 1792 of yacc.c  */
-#line 181 "yacc.y"
+#line 250 "yacc.y"
     { (yyval.node) = new_node(NODE_UNARY_OP, "+", (yyvsp[(2) - (2)].node), NULL, lineCount); }
     break;
 
   case 46:
 /* Line 1792 of yacc.c  */
-#line 182 "yacc.y"
+#line 251 "yacc.y"
     { (yyval.node) = new_node(NODE_UNARY_OP, "-", (yyvsp[(2) - (2)].node), NULL, lineCount); }
     break;
 
   case 47:
 /* Line 1792 of yacc.c  */
-#line 183 "yacc.y"
+#line 252 "yacc.y"
     { (yyval.node) = new_node(NODE_UNARY_OP, "++", (yyvsp[(2) - (2)].node), NULL, lineCount); }
     break;
 
   case 48:
 /* Line 1792 of yacc.c  */
-#line 184 "yacc.y"
+#line 253 "yacc.y"
     { (yyval.node) = new_node(NODE_UNARY_OP, "--", (yyvsp[(2) - (2)].node), NULL, lineCount); }
     break;
 
   case 49:
 /* Line 1792 of yacc.c  */
-#line 189 "yacc.y"
+#line 258 "yacc.y"
     {
-          if ((yyvsp[(2) - (2)].node)) {
+          if ((yyvsp[(2) - (2)].node))
               (yyval.node) = new_node(NODE_POSTFIX_OP, (yyvsp[(2) - (2)].node)->value, (yyvsp[(1) - (2)].node), NULL, lineCount);
-              free((yyvsp[(2) - (2)].node)->value); free((yyvsp[(2) - (2)].node));
-          } else {
+          else
               (yyval.node) = (yyvsp[(1) - (2)].node);
-          }
       }
     break;
 
   case 50:
 /* Line 1792 of yacc.c  */
-#line 200 "yacc.y"
+#line 267 "yacc.y"
     { (yyval.node) = NULL; }
     break;
 
   case 51:
 /* Line 1792 of yacc.c  */
-#line 201 "yacc.y"
+#line 268 "yacc.y"
     { (yyval.node) = new_node(NODE_UNKNOWN, "++", NULL, NULL, lineCount); }
     break;
 
   case 52:
 /* Line 1792 of yacc.c  */
-#line 202 "yacc.y"
+#line 269 "yacc.y"
     { (yyval.node) = new_node(NODE_UNKNOWN, "--", NULL, NULL, lineCount); }
     break;
 
   case 53:
 /* Line 1792 of yacc.c  */
-#line 206 "yacc.y"
+#line 273 "yacc.y"
     { (yyval.node) = new_node(NODE_IDENTIFIER, (yyvsp[(1) - (1)].str), NULL, NULL, lineCount); }
     break;
 
   case 54:
 /* Line 1792 of yacc.c  */
-#line 207 "yacc.y"
+#line 274 "yacc.y"
     { (yyval.node) = new_node(NODE_LITERAL, (yyvsp[(1) - (1)].str), NULL, NULL, lineCount); }
     break;
 
   case 55:
 /* Line 1792 of yacc.c  */
-#line 208 "yacc.y"
+#line 275 "yacc.y"
     { (yyval.node) = new_node(NODE_LITERAL, (yyvsp[(1) - (1)].str), NULL, NULL, lineCount); }
     break;
 
   case 56:
 /* Line 1792 of yacc.c  */
-#line 209 "yacc.y"
+#line 276 "yacc.y"
     { (yyval.node) = (yyvsp[(2) - (3)].node); }
     break;
 
 
 /* Line 1792 of yacc.c  */
-#line 1789 "yacc.tab.c"
+#line 1846 "yacc.tab.c"
       default: break;
     }
   /* User semantic actions sometimes alter yychar, and that requires
@@ -2017,19 +2074,17 @@ yyreturn:
 
 
 /* Line 2055 of yacc.c  */
-#line 212 "yacc.y"
+#line 279 "yacc.y"
 
 
-/* Error handler */
 void yyerror(const char *s) {
-    if (islexerror == 0) {               // only log if no previous error
-        FILE *out = fopen("output_print.txt", "w"); // overwrite
+    if (islexerror == 0) {
+        FILE *out = fopen("output_print.txt", "w");
         if (out) {
             fprintf(out, "[PARSE] Syntax Invalid [line:%d]\n", lineCount);
             fclose(out);
         }
-        islexerror = 1;                  // mark that an error was logged
+        islexerror = 1;
     }
     parse_failed = 1;
 }
-
