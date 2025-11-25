@@ -213,34 +213,23 @@ KnownVar *sem_add_var(const char *name, SEM_TYPE type)
         return existing;
 
     KnownVar *k = (KnownVar *)malloc(sizeof(KnownVar));
-    if (!k)
-        return NULL;
     k->name = strdup(name);
     k->temp = sem_new_temp(type);
-    k->temp.node = NULL;
     k->initialized = 0;
     k->used = 0;
     k->next = known_vars_head;
     known_vars_head = k;
 
+    // For KUAN, default type string in symbol table is "KUAN" initially
+    const char *dtype_str = "KUAN";
+    if (type == SEM_TYPE_INT)
+        dtype_str = "ENTEGER";
+    else if (type == SEM_TYPE_CHAR)
+        dtype_str = "CHAROT";
+
     int idx = find_symbol(name);
     if (idx == -1)
-    {
-        const char *dtype_str = "KUAN";
-        switch (type)
-        {
-        case SEM_TYPE_INT:
-            dtype_str = "ENTEGER";
-            break;
-        case SEM_TYPE_CHAR:
-            dtype_str = "CHAROT";
-            break;
-        default:
-            dtype_str = "KUAN";
-            break;
-        }
         add_symbol(name, dtype_str, 0, NULL);
-    }
 
     return k;
 }
@@ -494,7 +483,10 @@ static SEM_TEMP eval_additive(ASTNode *node)
             val = L.int_value - R.int_value;
         else
             goto no_fold_add;
-        SEM_TEMP t = sem_new_temp(SEM_TYPE_INT);
+        // Determine result type: preserve CHAR if any operand is CHAR
+        SEM_TYPE result_type = (L.type == SEM_TYPE_CHAR || R.type == SEM_TYPE_CHAR) ? SEM_TYPE_CHAR : SEM_TYPE_INT;
+
+        SEM_TEMP t = sem_new_temp(result_type);
         t.is_constant = 1;
         t.int_value = val;
         t.node = node;
@@ -780,6 +772,27 @@ void handle_declaration(ASTNode *decl_node)
                         if (strcmp(node->value, "INIT_DECL") == 0 && node->right)
                         {
                             SEM_TEMP val = evaluate_expression(node->right);
+
+                            // Infer type if KUAN
+                            if (dtype == SEM_TYPE_UNKNOWN)
+                            {
+                                if (val.type == SEM_TYPE_INT)
+                                    dtype = SEM_TYPE_INT;
+                                else if (val.type == SEM_TYPE_CHAR)
+                                    dtype = SEM_TYPE_CHAR;
+                            }
+
+                            // Only infer type if KUAN / UNKNOWN
+                            if (kv->temp.type == SEM_TYPE_UNKNOWN)
+                            {
+                                if (val.type == SEM_TYPE_CHAR)
+                                    kv->temp.type = SEM_TYPE_CHAR;
+                                else if (val.type == SEM_TYPE_INT)
+                                    kv->temp.type = SEM_TYPE_INT;
+                                else
+                                    kv->temp.type = SEM_TYPE_UNKNOWN; // fallback
+                            }
+
                             kv->initialized = 1;
                             kv->temp.is_constant = val.is_constant;
                             kv->temp.int_value = val.is_constant ? val.int_value : 0;
@@ -792,6 +805,7 @@ void handle_declaration(ASTNode *decl_node)
                                     snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", val.int_value);
                             }
                         }
+
                         else
                         {
                             // Default initialization to 0
@@ -813,15 +827,25 @@ void handle_declaration(ASTNode *decl_node)
             }
 
             // Right child may hold comma-separated declarations
-            if (node->right)
+            if (node->right && node->right->type == NODE_DECLARATION &&
+                node->right->value &&
+                (strcmp(node->right->value, "DECL") == 0 || strcmp(node->right->value, "INIT_DECL") == 0))
+            {
                 process_decl(node->right);
+            }
         }
         else if (node->type == NODE_IDENTIFIER)
         {
             const char *name = node->value;
             KnownVar *kv = sem_find_var(name);
-            if (!kv)
+            if (kv)
+            {
+                sem_record_error(node, "Redeclaration of variable '%s'", name);
+            }
+            else
+            {
                 kv = sem_add_var(name, dtype);
+            }
         }
     }
 
