@@ -1,4 +1,2 @@
-ENTEGER a = 'a'!
-CHAROT b = 67! 
-PRENT a, b!
-
+ENTEGER f = 'B'!
+PRENT 'A' - f!
