@@ -408,7 +408,10 @@ static SEM_TEMP eval_additive(ASTNode *node)
         if (strcmp(op, "+") == 0) val = L.int_value + R.int_value;
         else if (strcmp(op, "-") == 0) val = L.int_value - R.int_value;
         else goto no_fold_add;
-        SEM_TEMP t = sem_new_temp(SEM_TYPE_INT);
+        // Determine result type: preserve CHAR if any operand is CHAR
+        SEM_TYPE result_type = (L.type == SEM_TYPE_CHAR || R.type == SEM_TYPE_CHAR) ? SEM_TYPE_CHAR : SEM_TYPE_INT;
+
+        SEM_TEMP t = sem_new_temp(result_type);
         t.is_constant = 1;
         t.int_value = val;
         t.node = node;
@@ -683,7 +686,17 @@ void handle_declaration(ASTNode *decl_node)
                                     dtype = SEM_TYPE_CHAR;
                             }
 
-                            kv->temp.type = dtype;  // assign inferred type
+                            // Only infer type if KUAN / UNKNOWN
+                            if (kv->temp.type == SEM_TYPE_UNKNOWN)
+                            {
+                                if (val.type == SEM_TYPE_CHAR)
+                                    kv->temp.type = SEM_TYPE_CHAR;
+                                else if (val.type == SEM_TYPE_INT)
+                                    kv->temp.type = SEM_TYPE_INT;
+                                else
+                                    kv->temp.type = SEM_TYPE_UNKNOWN;  // fallback
+                            }
+
                             kv->initialized = 1;
                             kv->temp.is_constant = val.is_constant;
                             kv->temp.int_value = val.is_constant ? val.int_value : 0;
@@ -718,8 +731,13 @@ void handle_declaration(ASTNode *decl_node)
             }
 
             // Right child may hold comma-separated declarations
-            if (node->right)
+            if (node->right && node->right->type == NODE_DECLARATION &&
+                node->right->value &&
+                (strcmp(node->right->value, "DECL") == 0 || strcmp(node->right->value, "INIT_DECL") == 0))
+            {
                 process_decl(node->right);
+            }
+
         }
         else if (node->type == NODE_IDENTIFIER)
         {

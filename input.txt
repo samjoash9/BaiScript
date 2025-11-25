@@ -1,1 +1,4 @@
-ENTEGER a =2 , a!
+ENTEGER a = 'a'!
+CHAROT b = 67! 
+PRENT a, b!
+
