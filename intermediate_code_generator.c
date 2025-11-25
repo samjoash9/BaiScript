@@ -131,7 +131,8 @@ static char *generateExpression(ASTNode *node)
 
 static void generateDeclarationList(ASTNode *node)
 {
-    if (!node) return;
+    if (!node)
+        return;
 
     // If node is a wrapper (multiple declarations), recurse
     if (node->type == NODE_DECLARATION && node->value && strcmp(node->value, "DECL") == 0)
@@ -174,29 +175,33 @@ static void generateCode(ASTNode *node)
 
     switch (node->type)
     {
-        case NODE_START: generateCode(node->left); break;
-        case NODE_STATEMENT_LIST:
-            generateCode(node->left);
-            generateCode(node->right);
-            break;
-        case NODE_STATEMENT:
-            generateCode(node->left);
-            break;
-        case NODE_DECLARATION:
-        {
-            generateDeclarationList(node->left);
-            break;
-        }
-        case NODE_ASSIGNMENT:
-        case NODE_EXPRESSION:
-        case NODE_POSTFIX_OP:
-        case NODE_UNARY_OP:
-        {
-            char *res = generateExpression(node);
-            if (res) free(res);
-            break;
-        }
-        default: break;
+    case NODE_START:
+        generateCode(node->left);
+        break;
+    case NODE_STATEMENT_LIST:
+        generateCode(node->left);
+        generateCode(node->right);
+        break;
+    case NODE_STATEMENT:
+        generateCode(node->left);
+        break;
+    case NODE_DECLARATION:
+    {
+        generateDeclarationList(node->left);
+        break;
+    }
+    case NODE_ASSIGNMENT:
+    case NODE_EXPRESSION:
+    case NODE_POSTFIX_OP:
+    case NODE_UNARY_OP:
+    {
+        char *res = generateExpression(node);
+        if (res)
+            free(res);
+        break;
+    }
+    default:
+        break;
     }
 }
 

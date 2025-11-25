@@ -1,1 +1,5 @@
-ENTEGER a = 1, b = 2!
+ENTEGER a = 1!
+
+a++ + ++a!
+
+PRENT a!

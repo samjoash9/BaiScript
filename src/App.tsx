@@ -98,6 +98,30 @@ export default function App() {
     input.click();
   };
 
+  const handleExport = () => {
+    if (!targetCode) {
+      alert('Nothing to export!');
+      return;
+    }
+
+    if (targetCode.includes("No assembly generated due to parse errors.")) {
+      alert('Nothing to export!');
+      return;
+    }
+
+
+    const blob = new Blob([targetCode], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'assembly.txt';
+    a.click();
+
+    URL.revokeObjectURL(url);
+  };
+
+
   return (
     <div className={`min-h-screen transition-colors ${theme === 'dark'
       ? 'bg-linear-to-br from-gray-950 via-gray-900 to-black text-gray-100'
@@ -147,7 +171,12 @@ export default function App() {
         </div>
       </header>
 
-      <Toolbar onImport={handleImport} theme={theme} />
+      <Toolbar
+        onImport={handleImport}
+        onExport={handleExport}  // ← pass your export function
+        theme={theme}
+      />
+
 
       {/* Main Content Grid */}
       <main className="grid grid-cols-2 grid-rows-2 gap-4 p-4 h-[calc(100vh-140px)]">
