@@ -36,13 +36,12 @@ int main()
     {
         printf("Error: unable to open input.txt\n");
         return 1;
-        
     }
 
     printf("=== BaiScript IS PARSING! ===\n\n");
-  
-    parse_failed = 0;  // reset before starting
-    islexerror = 0; // reset before starting
+
+    parse_failed = 0; // reset before starting
+    islexerror = 0;   // reset before starting
     int result = yyparse();
 
     if (result == 0 && !parse_failed)

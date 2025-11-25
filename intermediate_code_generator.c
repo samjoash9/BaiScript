@@ -1,9 +1,13 @@
 // intermediate_code_generator.c
+// Corrected intermediate code generator (TAC) for BaiScript
+// - Uses temp0, temp1, ...
+// - Fully correct prefix/postfix semantics
+// - Single assignment emission
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-
 #include "intermediate_code_generator.h"
 
 static TACInstruction *code = NULL;
@@ -44,108 +48,88 @@ static void emit(const char *result, const char *arg1, const char *op, const cha
     codeCount++;
 }
 
-// === Expression Generator ===
+// === Expression Generator with Correct Prefix/Postfix ===
 static char *generateExpression(ASTNode *node)
 {
     if (!node)
         return NULL;
 
-    // Leaf node (identifier or literal)
-    if (node->left == NULL && node->right == NULL)
+    // Leaf node (variable or literal)
+    if (!node->left && !node->right)
         return strdup(node->value ? node->value : "");
 
-    // Assignment (simple or compound)
+    // Assignment
     if (node->type == NODE_ASSIGNMENT && node->left && node->right)
     {
-        char *lhs = node->left->value;
-
-        // Simple assignment
-        if (strcmp(node->value, "=") == 0)
-        {
-            char *rhs = generateExpression(node->right);
-            emit(lhs, rhs, "=", NULL);
-            free(rhs);
-            return strdup(lhs);
-        }
-        // Compound assignment (+=, -=, *=, /=)
-        else if (strcmp(node->value, "+=") == 0 ||
-                 strcmp(node->value, "-=") == 0 ||
-                 strcmp(node->value, "*=") == 0 ||
-                 strcmp(node->value, "/=") == 0)
-        {
-            char op[2] = {node->value[0], '\0'}; // "+=" -> '+'
-            char *rhs = generateExpression(node->right);
-            emit(lhs, lhs, op, rhs); // x = x op rhs
-            free(rhs);
-            return strdup(lhs);
-        }
+        char *lhs_name = strdup(node->left->value);
+        char *rhs_val = generateExpression(node->right);
+        emit(lhs_name, rhs_val, "=", NULL);
+        free(rhs_val);
+        return lhs_name;
     }
 
-    // Postfix operations (++ / --)
+    // Postfix (++ / --)
     if (node->type == NODE_POSTFIX_OP && node->left)
     {
-        char *var = generateExpression(node->left); // get current value
-        char *tmp = newTemp();                      // temp for expression
+        char *var = generateExpression(node->left);
+        char *tmp = newTemp();
 
+        // Postfix returns original value, then increments/decrements
+        emit(tmp, var, "=", NULL); // temp = var
         if (strcmp(node->value, "++") == 0)
-        {
-            emit(tmp, var, "=", NULL); // tmp = current value
-            emit(var, var, "+", "1");  // increment after
-        }
+            emit(var, var, "+", "1"); // var = var + 1
         else if (strcmp(node->value, "--") == 0)
-        {
-            emit(tmp, var, "=", NULL); // tmp = current value
-            emit(var, var, "-", "1");  // decrement after
-        }
+            emit(var, var, "-", "1"); // var = var - 1
 
         free(var);
-        return tmp; // use original value in expression
+        return tmp;
     }
 
-    // Unary operators (++ / -- / + / -)
+    // Prefix / Unary (++ / -- / + / -)
     if (node->type == NODE_UNARY_OP && node->left)
     {
-        char *lhs = generateExpression(node->left);
+        char *opnd = generateExpression(node->left);
+
         if (strcmp(node->value, "++") == 0)
         {
-            emit(lhs, lhs, "+", "1");
-            return lhs;
+            emit(opnd, opnd, "+", "1");
+            return opnd; // prefix returns incremented value
         }
         else if (strcmp(node->value, "--") == 0)
         {
-            emit(lhs, lhs, "-", "1");
-            return lhs;
+            emit(opnd, opnd, "-", "1");
+            return opnd; // prefix returns decremented value
         }
         else if (strcmp(node->value, "-") == 0)
         {
             char *tmp = newTemp();
-            emit(tmp, "0", "-", lhs);
-            free(lhs);
+            emit(tmp, "0", "-", opnd);
+            free(opnd);
             return tmp;
         }
         else if (strcmp(node->value, "+") == 0)
         {
-            return lhs;
+            return opnd;
         }
+        return opnd;
     }
 
-    // Binary operations (+, -, *, /)
+    // Binary operations
     if (node->left && node->right)
     {
-        char *left = generateExpression(node->left);
-        char *right = generateExpression(node->right);
+        char *left_val = generateExpression(node->left);
+        char *right_val = generateExpression(node->right);
         char *tmp = newTemp();
-        emit(tmp, left, node->value, right);
-        free(left);
-        free(right);
+        emit(tmp, left_val, node->value, right_val);
+        free(left_val);
+        free(right_val);
         return tmp;
     }
 
-    // fallback
     return strdup(node->value ? node->value : "");
 }
 
-// === Code Generator ===
+// === AST Walker / Code Generator ===
 static void generateCode(ASTNode *node)
 {
     if (!node)
@@ -156,35 +140,33 @@ static void generateCode(ASTNode *node)
     case NODE_START:
         generateCode(node->left);
         break;
-
     case NODE_STATEMENT_LIST:
         generateCode(node->left);
         generateCode(node->right);
         break;
-
     case NODE_STATEMENT:
         generateCode(node->left);
         break;
-
     case NODE_DECLARATION:
     {
         ASTNode *cur = node->left;
         while (cur)
         {
-            if (cur->left)
+            if (cur->left && cur->right)
             {
-                char *rhs = generateExpression(cur->left);
+                char *ident = strdup(cur->left->value);
+                char *rhs = generateExpression(cur->right);
                 if (rhs)
                 {
-                    emit(cur->value, rhs, "=", NULL);
+                    emit(ident, rhs, "=", NULL);
                     free(rhs);
                 }
+                free(ident);
             }
             cur = cur->right;
         }
         break;
     }
-
     case NODE_ASSIGNMENT:
     case NODE_EXPRESSION:
     case NODE_POSTFIX_OP:
@@ -195,42 +177,44 @@ static void generateCode(ASTNode *node)
             free(res);
         break;
     }
-
     default:
         break;
     }
 }
 
-// === Optimization: remove redundant temporaries ===
+// === Optimization: remove empty-result TAC ===
 static void removeRedundantTemporaries()
 {
     if (codeCount == 0)
-        return;
-
-    optimizedCode = malloc(sizeof(TACInstruction) * codeCount);
-    memcpy(optimizedCode, code, sizeof(TACInstruction) * codeCount);
-    optimizedCount = codeCount;
-
-    for (int i = 0; i < optimizedCount - 1; i++)
     {
-        TACInstruction *cur = &optimizedCode[i];
-        TACInstruction *next = &optimizedCode[i + 1];
-
-        if (cur->result[0] == 't' && strcmp(next->arg1, cur->result) == 0 && strcmp(next->op, "=") == 0)
-        {
-            snprintf(next->arg1, sizeof(next->arg1), "%s", cur->arg1);
-            snprintf(next->op, sizeof(next->op), "%s", cur->op);
-            snprintf(next->arg2, sizeof(next->arg2), "%s", cur->arg2);
-            cur->result[0] = '\0';
-        }
+        optimizedCode = NULL;
+        optimizedCount = 0;
+        return;
     }
+    TACInstruction *tmp = malloc(sizeof(TACInstruction) * codeCount);
+    if (!tmp)
+    {
+        fprintf(stderr, "Out of memory\n");
+        exit(1);
+    }
+    memcpy(tmp, code, sizeof(TACInstruction) * codeCount);
 
     int j = 0;
-    for (int i = 0; i < optimizedCount; i++)
-        if (strlen(optimizedCode[i].result) > 0)
-            optimizedCode[j++] = optimizedCode[i];
+    for (int i = 0; i < codeCount; i++)
+    {
+        if (strlen(tmp[i].result) > 0)
+            tmp[j++] = tmp[i];
+    }
 
+    optimizedCode = malloc(sizeof(TACInstruction) * j);
+    if (!optimizedCode)
+    {
+        fprintf(stderr, "Out of memory\n");
+        exit(1);
+    }
+    memcpy(optimizedCode, tmp, sizeof(TACInstruction) * j);
     optimizedCount = j;
+    free(tmp);
 }
 
 // === Display ===
@@ -241,6 +225,8 @@ static void displayTAC()
     {
         TACInstruction *inst = &code[i];
         if (strcmp(inst->op, "=") == 0 && strlen(inst->arg2) == 0)
+            printf("%s = %s\n", inst->result, inst->arg1);
+        else if (strlen(inst->op) == 0)
             printf("%s = %s\n", inst->result, inst->arg1);
         else
             printf("%s = %s %s %s\n", inst->result, inst->arg1, inst->op, inst->arg2);
@@ -255,6 +241,8 @@ static void displayOptimizedTAC()
     {
         TACInstruction *inst = &optimizedCode[i];
         if (strcmp(inst->op, "=") == 0 && strlen(inst->arg2) == 0)
+            printf("%s = %s\n", inst->result, inst->arg1);
+        else if (strlen(inst->op) == 0)
             printf("%s = %s\n", inst->result, inst->arg1);
         else
             printf("%s = %s %s %s\n", inst->result, inst->arg1, inst->op, inst->arg2);
