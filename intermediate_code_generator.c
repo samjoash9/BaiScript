@@ -24,6 +24,51 @@ TACInstruction *getOptimizedCode(int *count)
     return optimizedCode;
 }
 
+static int is_char_literal(const char *s, char *out)
+{
+    if (!s || !out)
+        return 0;
+    size_t len = strlen(s);
+    if (len >= 3 && s[0] == '\'' && s[len - 1] == '\'')
+    {
+        if (len == 3)
+        {
+            *out = s[1]; // e.g., 'A' -> A
+            return 1;
+        }
+        else if (len == 4 && s[1] == '\\')
+        { // escape sequences
+            switch (s[2])
+            {
+            case 'n':
+                *out = '\n';
+                return 1;
+            case 't':
+                *out = '\t';
+                return 1;
+            case 'r':
+                *out = '\r';
+                return 1;
+            case '0':
+                *out = '\0';
+                return 1;
+            case '\\':
+                *out = '\\';
+                return 1;
+            case '\'':
+                *out = '\'';
+                return 1;
+            case '"':
+                *out = '"';
+                return 1;
+            default:
+                return 0;
+            }
+        }
+    }
+    return 0;
+}
+
 static char *newTemp()
 {
     char buf[32];
@@ -56,7 +101,24 @@ static char *generateExpression(ASTNode *node)
 
     // Leaf node (variable or literal)
     if (!node->left && !node->right)
-        return strdup(node->value ? node->value : "");
+    {
+        if (node->value)
+        {
+            char cval;
+            if (is_char_literal(node->value, &cval))
+            {
+                // Replace char literal with its ASCII integer value
+                char buf[32];
+                snprintf(buf, sizeof(buf), "%d", (int)cval);
+                return strdup(buf);
+            }
+            else
+            {
+                return strdup(node->value);
+            }
+        }
+        return strdup("");
+    }
 
     // Assignment
     if (node->type == NODE_ASSIGNMENT && node->left && node->right)
