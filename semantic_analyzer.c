@@ -637,80 +637,96 @@ static void handle_print(ASTNode *print_node)
    Declaration & assignment
 ---------------------------- */
 
-static void handle_declaration(ASTNode *decl_node)
+/* ----------------------------
+   Handle declaration AST node
+   (for your tyacc-generated AST)
+---------------------------- */
+void handle_declaration(ASTNode *decl_node)
 {
     if (!decl_node) return;
 
+    // Determine the datatype (from parent DECLARATION node)
     SEM_TYPE dtype = sem_type_from_string(decl_node->value);
 
-    // Recursive helper
+    // Recursive helper to traverse DECL / INIT_DECL
     void process_decl(ASTNode *node)
     {
         if (!node) return;
-        if (node->type != NODE_DECLARATION) return;  // only NODE_DECLARATION here
 
-        ASTNode *idnode = node->left;   // left is the actual declarator (IDENTIFIER)
-        ASTNode *init_expr = NULL;
-
-        // If idnode itself is a NODE_DECLARATION "INIT_DECL", then init_expr is its right
-        if (idnode && strcmp(idnode->value, "INIT_DECL") == 0)
+        if ((node->type == NODE_DECLARATION) && 
+            (node->value && (strcmp(node->value, "DECL") == 0 || strcmp(node->value, "INIT_DECL") == 0)))
         {
-            if (idnode->left) idnode = idnode->left;
-            if (node->left->right) init_expr = node->left->right;
-        }
-        else if (idnode && idnode->type == NODE_IDENTIFIER)
-        {
-            init_expr = node->right;
-        }
-
-        if (idnode && idnode->type == NODE_IDENTIFIER)
-        {
-            const char *name = idnode->value;
-            KnownVar *kv = sem_find_var(name);
-            if (kv)
+            // Left child may be identifier or another DECL/INIT_DECL
+            if (node->left)
             {
-                sem_record_error(idnode, "Redeclaration of variable '%s'", name);
-            }
-            else
-            {
-                kv = sem_add_var(name, dtype);
-                kv->temp.node = idnode;
-
-                if (init_expr)
+                if (node->left->type == NODE_IDENTIFIER)
                 {
-                    SEM_TEMP val = evaluate_expression(init_expr);
-                    kv->initialized = 1;
-                    kv->temp.is_constant = val.is_constant;
-                    kv->temp.int_value = val.is_constant ? val.int_value : 0;
+                    const char *name = node->left->value;
 
-                    int idx = find_symbol(name);
-                    if (idx != -1)
+                    // Check redeclaration
+                    KnownVar *kv = sem_find_var(name);
+                    if (kv)
                     {
-                        symbol_table[idx].initialized = 1;
-                        if (val.is_constant)
-                            snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", val.int_value);
+                        sem_record_error(node->left, "Redeclaration of variable '%s'", name);
+                    }
+                    else
+                    {
+                        kv = sem_add_var(name, dtype);
+                        kv->temp.node = node->left;
+
+                        // Handle initializer if exists
+                        if (strcmp(node->value, "INIT_DECL") == 0 && node->right)
+                        {
+                            SEM_TEMP val = evaluate_expression(node->right);
+                            kv->initialized = 1;
+                            kv->temp.is_constant = val.is_constant;
+                            kv->temp.int_value = val.is_constant ? val.int_value : 0;
+
+                            int idx = find_symbol(name);
+                            if (idx != -1)
+                            {
+                                symbol_table[idx].initialized = 1;
+                                if (val.is_constant)
+                                    snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", val.int_value);
+                            }
+                        }
+                        else
+                        {
+                            // Default initialization to 0
+                            kv->initialized = 1;
+                            kv->temp.is_constant = 1;
+                            kv->temp.int_value = 0;
+
+                            int idx = find_symbol(name);
+                            if (idx != -1)
+                                snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%d", 0);
+                        }
                     }
                 }
                 else
                 {
-                    kv->initialized = 1;
-                    kv->temp.is_constant = 1;
-                    kv->temp.int_value = 0;
-
-                    int idx = find_symbol(name);
-                    if (idx != -1)
-                        snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%d", 0);
+                    // Left is nested DECL → recurse
+                    process_decl(node->left);
                 }
             }
-        }
 
-        // Recurse to next declaration in the chain
-        if (node->right)
-            process_decl(node->right);
+            // Right child may hold comma-separated declarations
+            if (node->right)
+                process_decl(node->right);
+        }
+        else if (node->type == NODE_IDENTIFIER)
+        {
+            const char *name = node->value;
+            KnownVar *kv = sem_find_var(name);
+            if (!kv)
+                kv = sem_add_var(name, dtype);
+        }
     }
+
 
     process_decl(decl_node->left);
 }
+
 
 
 static void handle_assignment(ASTNode *assign_node)

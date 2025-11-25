@@ -200,7 +200,7 @@ static void generateCode(ASTNode *node)
     }
 }
 
-// === Optimization: remove empty-result TAC ===
+// === Optimization: inline temporaries ===
 static void removeRedundantTemporaries()
 {
     if (codeCount == 0)
@@ -209,30 +209,54 @@ static void removeRedundantTemporaries()
         optimizedCount = 0;
         return;
     }
-    TACInstruction *tmp = malloc(sizeof(TACInstruction) * codeCount);
-    if (!tmp)
-    {
-        fprintf(stderr, "Out of memory\n");
-        exit(1);
-    }
-    memcpy(tmp, code, sizeof(TACInstruction) * codeCount);
 
-    int j = 0;
-    for (int i = 0; i < codeCount; i++)
-    {
-        if (strlen(tmp[i].result) > 0)
-            tmp[j++] = tmp[i];
-    }
-
-    optimizedCode = malloc(sizeof(TACInstruction) * j);
+    optimizedCode = malloc(sizeof(TACInstruction) * codeCount);
     if (!optimizedCode)
     {
         fprintf(stderr, "Out of memory\n");
         exit(1);
     }
-    memcpy(optimizedCode, tmp, sizeof(TACInstruction) * j);
+
+    int j = 0;
+    for (int i = 0; i < codeCount; i++)
+    {
+        TACInstruction *cur = &code[i];
+
+        // Check if this line is a temp assigned and immediately copied
+        int inlined = 0;
+        if (strncmp(cur->result, "temp", 4) == 0 && strlen(cur->op) > 0)
+        {
+            // Look ahead to find single copy
+            for (int k = i+1; k < codeCount; k++)
+            {
+                TACInstruction *next = &code[k];
+                if (strcmp(next->arg1, cur->result) == 0 && strcmp(next->op, "=") == 0)
+                {
+                    // Inline temp: next.result = cur.arg1 op cur.arg2
+                    snprintf(optimizedCode[j].result, sizeof(optimizedCode[j].result), "%s", next->result);
+                    snprintf(optimizedCode[j].arg1, sizeof(optimizedCode[j].arg1), "%s", cur->arg1);
+                    snprintf(optimizedCode[j].op, sizeof(optimizedCode[j].op), "%s", cur->op);
+                    snprintf(optimizedCode[j].arg2, sizeof(optimizedCode[j].arg2), "%s", cur->arg2);
+                    j++;
+                    inlined = 1;
+
+                    // Skip next line because it’s merged
+                    i = k;
+                    break;
+                }
+                // If temp is used in another place, do not inline
+                if (strcmp(next->arg1, cur->result) != 0 && strcmp(next->arg2, cur->result) != 0)
+                    continue;
+            }
+        }
+
+        if (!inlined)
+        {
+            optimizedCode[j++] = *cur;
+        }
+    }
+
     optimizedCount = j;
-    free(tmp);
 }
 
 // === Display ===
