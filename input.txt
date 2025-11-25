@@ -1,5 +1,9 @@
-ENTEGER a = 1!
+ENTEGER a!
 
-a++ + ++a!
+ENTEGER b, c, d!
 
-PRENT a!
+ENTEGER e = 1, f = 2!
+
+a =1!
+
+a = ++a + a++!

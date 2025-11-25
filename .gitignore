@@ -1,8 +1,7 @@
-node_modules
-build
-dist
-*.exe
 input.txt
-output.txt
-.DS_Store
-*.log
+output_assembly.txt
+output_machine.txt
+output_print.txt
+output_tac.txt
+parser.exe
+
