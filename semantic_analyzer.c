@@ -25,10 +25,11 @@ static KnownVar *known_vars_head = NULL;
 
 static int sem_errors = 0;
 static int sem_warnings = 0;
+static int sem_inside_print = 0; // 1 if evaluating inside a PRENT
 
 static FILE *out_file = NULL; 
 
-/* Deferred postfix ops */
+/* Deferred postfix ops (kept for possible future policy changes) */
 typedef struct DeferredOp {
     KnownVar *kv;
     int delta; // +1 for ++, -1 for --
@@ -105,6 +106,7 @@ static int ensure_ops_capacity(void)
 
 /* ----------------------------
    Deferred postfix helpers
+   (retained but not used for current immediate semantics)
 ---------------------------- */
 static void push_deferred_op(KnownVar *kv, int delta)
 {
@@ -302,7 +304,8 @@ static SEM_TEMP eval_factor(ASTNode *node)
         KnownVar *kv = sem_find_var(name);
         if (kv)
         {
-            kv->used = 1;
+            kv->used = 1;  // mark as used
+            if (sem_inside_print) kv->used = 1; // redundant but explicit
             if (!kv->initialized)
                 sem_record_error(node, "Use of uninitialized variable '%s'", name);
             SEM_TEMP t = kv->temp;
@@ -445,6 +448,7 @@ static SEM_TEMP evaluate_expression(ASTNode *node)
                 }
                 const char *name = target->value;
                 KnownVar *kv = sem_find_var(name);
+                if (kv && sem_inside_print) kv->used = 1;
                 if (!kv) kv = sem_add_var(name, SEM_TYPE_INT);
                 if (!kv->initialized) {
                     sem_record_error(target, "Prefix %s on uninitialized variable '%s'", op, name);
@@ -487,7 +491,6 @@ static SEM_TEMP evaluate_expression(ASTNode *node)
         }
         case NODE_POSTFIX_OP:
         {
-            // postfix op: return old value but schedule increment/decrement
             const char *op = node->value ? node->value : "";
             ASTNode *target = node->left;
             if (!target || target->type != NODE_IDENTIFIER) {
@@ -497,23 +500,43 @@ static SEM_TEMP evaluate_expression(ASTNode *node)
             const char *name = target->value;
             KnownVar *kv = sem_find_var(name);
             if (!kv) kv = sem_add_var(name, SEM_TYPE_INT);
+            if (kv && sem_inside_print) kv->used = 1;
 
-            // old value to return
-            SEM_TEMP old = kv->temp;
-            old.node = node;
-            if (!kv->initialized) {
-                // per C semantics using uninitialized is undefined; here we record error
-                sem_record_error(target, "Use of uninitialized variable '%s' in postfix operation", name);
-                old.is_constant = 0;
+            SEM_TEMP ret = kv->temp;
+            ret.node = node;
+
+            if (!kv->initialized)
+            {
+                if (!sem_inside_print)  // only warn if NOT inside PRENT
+                    sem_record_error(target, "Use of uninitialized variable '%s' in postfix operation", name);
+                ret.is_constant = 0;
             }
 
             int delta = 0;
             if (strcmp(op, "++") == 0) delta = 1;
             else if (strcmp(op, "--") == 0) delta = -1;
-            if (delta != 0) {
-                push_deferred_op(kv, delta);
+
+            if (delta != 0)
+            {
+                long before = (ret.is_constant ? ret.int_value : 0);
+                long after = before + delta;
+
+                kv->temp.is_constant = 1;
+                kv->temp.int_value = after;
+                kv->initialized = 1;
+
+                int idx = find_symbol(kv->name);
+                if (idx != -1)
+                {
+                    symbol_table[idx].initialized = 1;
+                    snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", after);
+                }
+
+                ret.is_constant = 1;
+                ret.int_value = after;
             }
-            return old;
+
+            return ret;
         }
         case NODE_IDENTIFIER:
         case NODE_LITERAL: return eval_factor(node);
@@ -550,6 +573,8 @@ static void handle_print(ASTNode *print_node)
 {
     if (!print_node) return;
 
+    sem_inside_print = 1; // Begin print context
+
     ASTNode *item = print_node->left;
     while (item)
     {
@@ -562,13 +587,42 @@ static void handle_print(ASTNode *print_node)
             size_t len = strlen(val);
             if (len >= 2 && val[0] == '"' && val[len-1] == '"')
                 snprintf(tempbuf, sizeof(tempbuf), "%.*s", (int)(len-2), val+1);
+            else if (len >= 2 && val[0] == '\'' && val[len-1] == '\'')
+                snprintf(tempbuf, sizeof(tempbuf), "%.*s", (int)(len-2), val+1);
             else
                 snprintf(tempbuf, sizeof(tempbuf), "%s", val);
         }
         else
         {
             SEM_TEMP val = evaluate_expression(expr);
-            if (val.is_constant) snprintf(tempbuf, sizeof(tempbuf), "%ld", val.int_value);
+
+            if (expr->type == NODE_IDENTIFIER)
+            {
+                KnownVar *kv = sem_find_var(expr->value);
+                if (kv) kv->used = 1;  // mark as used
+
+                if (kv && kv->temp.is_constant)
+                {
+                    if (kv->temp.type == SEM_TYPE_CHAR)
+                        snprintf(tempbuf, sizeof(tempbuf), "%c", (char)kv->temp.int_value);
+                    else
+                        snprintf(tempbuf, sizeof(tempbuf), "%ld", kv->temp.int_value);
+                }
+                else
+                {
+                    if (val.type == SEM_TYPE_CHAR)
+                        snprintf(tempbuf, sizeof(tempbuf), "%c", (char)val.int_value);
+                    else
+                        snprintf(tempbuf, sizeof(tempbuf), "%ld", val.is_constant ? val.int_value : 0);
+                }
+            }
+            else
+            {
+                if (val.type == SEM_TYPE_CHAR)
+                    snprintf(tempbuf, sizeof(tempbuf), "%c", (char)val.int_value);
+                else
+                    snprintf(tempbuf, sizeof(tempbuf), "%ld", val.is_constant ? val.int_value : 0);
+            }
         }
 
         buffer_print(tempbuf);
@@ -576,7 +630,9 @@ static void handle_print(ASTNode *print_node)
     }
 
     buffer_print("\n");
+    sem_inside_print = 0; // End print context
 }
+
 
 
 
@@ -726,7 +782,7 @@ static void analyze_node(ASTNode *node)
             break;
         case NODE_STATEMENT:
             analyze_node(node->left);
-            apply_deferred_ops();
+            apply_deferred_ops(); // harmless (not used in current immediate semantics)
             break;
         case NODE_DECLARATION:
             handle_declaration(node);

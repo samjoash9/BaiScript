@@ -1,4 +1,6 @@
-1+1=2
+9
+9
+11
 
 
 === COMPILATION SUCCESSFULL ===
