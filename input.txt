@@ -1,1 +1,3 @@
-WEH
+KUAN a = 'a'!
+
+PRENT a!

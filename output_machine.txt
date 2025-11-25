@@ -1,1 +1,2 @@
-No machine code generated due to parse errors.
+daddiu r1, r0, 97         -> 01100100000000010000000001100001 (0x64010061)
+sd r1, a(r0)              -> 11111100000000010000000000000000 (0xFC010000)

@@ -1,1 +1,7 @@
-No assembly generated due to parse errors.
+.data
+a: .word64 0
+
+.code
+; a = 'a'
+daddiu r1, r0, 97
+sd r1, a(r0)
