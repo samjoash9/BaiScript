@@ -26,11 +26,20 @@ void add_assembly_line(const char *format, ...)
 
 void display_assembly_code()
 {
+    printf("===== ASSEMBLY CODE =====\n");
     for (int i = 0; i < assembly_code_count; i++)
     {
         char *line = assembly_code[i].assembly;
+        // Remove final newline for last line for clean printing
+        if (i == assembly_code_count - 1)
+        {
+            size_t len = strlen(line);
+            if (len > 0 && line[len - 1] == '\n')
+                line[len - 1] = '\0';
+        }
         printf("%s", line);
     }
+    printf("\n===== ASSEMBLY CODE END =====\n\n");
 }
 
 void initialize_registers()
@@ -61,32 +70,28 @@ int is_in_data_storage(char *data)
 Register *get_available_register()
 {
     for (int i = 0; i < MAX_REGISTERS; i++)
-    {
-        if (registers[i].used == 0)
+        if (!registers[i].used)
             return &registers[i];
-    }
     return NULL;
 }
 
 int is_tac_temporary(char *tac)
 {
-    if (!tac)
+    if (!tac || strncmp(tac, "temp", 4) != 0)
         return 0;
-    if (strncmp(tac, "temp", 4) != 0)
-        return 0;
+
     for (int i = 4; tac[i] != '\0'; i++)
         if (!isdigit((unsigned char)tac[i]))
             return 0;
-    return 1;
+
+    return strlen(tac) > 4;
 }
 
 Register *find_temp_reg(char *temp)
 {
     for (int i = 0; i < MAX_REGISTERS; i++)
-    {
         if (registers[i].used && strcmp(registers[i].assigned_temp, temp) == 0)
             return &registers[i];
-    }
     return NULL;
 }
 
@@ -94,43 +99,20 @@ int is_digit(char *value)
 {
     if (!value || !*value)
         return 0;
-    char *v = value;
-    if (*v == '-')
-        v++;
-    if (!*v)
+
+    if (*value == '-')
+        value++;
+
+    if (!*value)
         return 0;
-    while (*v)
+
+    while (*value)
     {
-        if (!isdigit(*v))
+        if (!isdigit(*value))
             return 0;
-        v++;
+        value++;
     }
     return 1;
-}
-
-// === CHAROT CONVERSION ===
-void convert_char_to_int(char *arg)
-{
-    if (!arg || arg[0] == '\0')
-        return;
-
-    // literal char 'a'
-    if (arg[0] == '\'' && arg[2] == '\'' && arg[3] == '\0')
-    {
-        int val = (int)arg[1];
-        sprintf(arg, "%d", val);
-        return;
-    }
-
-    // variable of type CHAROT
-    int idx = find_symbol(arg);
-    if (idx >= 0 && strcmp(symbol_table[idx].datatype, "CHAROT") == 0)
-    {
-        if (symbol_table[idx].initialized && strlen(symbol_table[idx].value_str) == 1)
-        {
-            sprintf(arg, "%d", (int)symbol_table[idx].value_str[0]);
-        }
-    }
 }
 
 // === DATA SECTION ===
@@ -156,7 +138,8 @@ void display_tac_as_comment(TACInstruction ins)
 }
 
 // === PERFORM OPERATION ===
-void perform_operation(char *result, char *arg1, char *op, char *arg2, Register *reg1, Register *reg2, Register *reg3, int is_for_temporary)
+void perform_operation(char *result, char *arg1, char *op, char *arg2,
+                       Register *reg1, Register *reg2, Register *reg3, int is_for_temporary)
 {
     if (strcmp(op, "+") == 0)
         add_assembly_line("daddu %s, %s, %s\n", reg3->name, reg1->name, reg2->name);
@@ -202,146 +185,365 @@ void perform_operation(char *result, char *arg1, char *op, char *arg2, Register 
     }
 }
 
-// === CODE SECTION ===
 void generate_code_section()
 {
     add_assembly_line("\n.code\n");
+
     for (int i = 0; i < optimizedCount; i++)
     {
         TACInstruction ins = optimizedCode[i];
         display_tac_as_comment(ins);
 
-        convert_char_to_int(ins.arg1);
-        convert_char_to_int(ins.arg2);
-
-        Register *reg1 = NULL, *reg2 = NULL, *reg3 = NULL;
-
-        if (is_tac_temporary(ins.result))
+        // case 1 : assignment only
+        if (strlen(ins.arg2) == 0)
         {
-            // temp result, assign reg3
-            reg3 = find_temp_reg(ins.result);
-            if (!reg3)
-                reg3 = get_available_register();
-            reg3->used = 1;
-            strcpy(reg3->assigned_temp, ins.result);
+            // case 1 : variable = constant (for constant: check if positive or negative)
+            if (is_in_data_storage(ins.result) &&
+                (isdigit(ins.arg1[0]) || (ins.arg1[0] == '-' && isdigit(ins.arg1[1]))))
+            {
+                Register *reg = get_available_register();
+                reg->used = 1;
+
+                add_assembly_line("daddiu %s, r0, %s\n", reg->name, ins.arg1);
+                add_assembly_line("sd %s, %s(r0)\n", reg->name, ins.result);
+
+                reg->used = 0;
+            }
+            // case 2 : variable = variable
+            else if (is_in_data_storage(ins.result) && is_in_data_storage(ins.arg1))
+            {
+                Register *arg1_val_reg = get_available_register();
+                arg1_val_reg->used = 1;
+
+                add_assembly_line("ld %s, %s(r0)\n", arg1_val_reg->name, ins.arg1);
+                add_assembly_line("sd %s, %s(r0)\n", arg1_val_reg->name, ins.result);
+
+                arg1_val_reg->used = 0;
+            }
+            // case 3 : variable = temp
+            else if (is_in_data_storage(ins.result) && is_tac_temporary(ins.arg1))
+            {
+                // find register temp
+                Register *temp_reg = find_temp_reg(ins.arg1);
+
+                add_assembly_line("sd %s, %s(r0)\n", temp_reg->name, ins.result);
+            }
+            // case 4 : temp = variable
+            else if (is_tac_temporary(ins.result) && is_in_data_storage(ins.arg1))
+            {
+                Register *var_reg = get_available_register();
+                var_reg->used = 1;
+
+                add_assembly_line("ld %s, %s(r0)\n", var_reg->name, ins.arg1);
+                // the available register now becomes the temporary
+                strcpy(var_reg->assigned_temp, ins.result);
+            }
+            // case 5 : temp = constant
+            else if (is_tac_temporary(ins.result) && is_digit(ins.arg1))
+            {
+                Register *temp_reg = get_available_register();
+                temp_reg->used = 1;
+                strcpy(temp_reg->assigned_temp, ins.result);
+
+                add_assembly_line("daddiu %s, r0, %s\n", temp_reg->name, ins.arg1);
+            }
+            // case 6 : temp = temp
+            else if (is_tac_temporary(ins.result) && is_tac_temporary(ins.arg1))
+            {
+                // Find both temp registers
+                Register *temp_res = find_temp_reg(ins.result);
+                Register *temp_arg1 = find_temp_reg(ins.arg1);
+
+                // If result temp does not yet have a register, allocate one
+                if (!temp_res)
+                {
+                    temp_res = get_available_register();
+                    temp_res->used = 1;
+                    strcpy(temp_res->assigned_temp, ins.result);
+                }
+
+                // If argument temp does not exist (shouldn’t normally happen, but safe to check)
+                if (!temp_arg1)
+                {
+                    temp_arg1 = get_available_register();
+                    temp_arg1->used = 1;
+                    strcpy(temp_arg1->assigned_temp, ins.arg1);
+                }
+
+                // Move value from arg1 temp into result temp
+                add_assembly_line("daddu %s, %s, r0\n", temp_res->name, temp_arg1->name);
+            }
         }
+        // case 2 : assignment + operation
         else
         {
-            reg3 = get_available_register();
+            Register *reg1 = get_available_register();
+            reg1->used = 1;
+            Register *reg2 = get_available_register();
+            reg2->used = 1;
+            Register *reg3 = get_available_register();
             reg3->used = 1;
-        }
 
-        // Binary operation
-        if (strlen(ins.arg2) > 0)
-        {
-            // arg1
-            if (is_digit(ins.arg1))
+            // variable = constant op constant
+            if (is_in_data_storage(ins.result) && is_digit(ins.arg1) && is_digit(ins.arg2))
             {
-                reg1 = get_available_register();
-                reg1->used = 1;
                 add_assembly_line("daddiu %s, r0, %s\n", reg1->name, ins.arg1);
-            }
-            else if (is_tac_temporary(ins.arg1))
-            {
-                reg1 = find_temp_reg(ins.arg1);
-                if (!reg1)
-                {
-                    reg1 = get_available_register();
-                    reg1->used = 1;
-                    strcpy(reg1->assigned_temp, ins.arg1);
-                }
-            }
-            else
-            {
-                reg1 = get_available_register();
-                reg1->used = 1;
-                add_assembly_line("ld %s, %s(r0)\n", reg1->name, ins.arg1);
-            }
-
-            // arg2
-            if (is_digit(ins.arg2))
-            {
-                reg2 = get_available_register();
-                reg2->used = 1;
                 add_assembly_line("daddiu %s, r0, %s\n", reg2->name, ins.arg2);
+
+                perform_operation(ins.result, ins.arg1, ins.op, ins.arg2, reg1, reg2, reg3, 0);
             }
-            else if (is_tac_temporary(ins.arg2))
+            // variable = variable op variable
+            else if (is_in_data_storage(ins.result) && is_in_data_storage(ins.arg1) && is_in_data_storage(ins.arg2))
             {
+                add_assembly_line("ld %s, %s(r0)\n", reg1->name, ins.arg1);
+                add_assembly_line("ld %s, %s(r0)\n", reg2->name, ins.arg2);
+
+                perform_operation(ins.result, ins.arg1, ins.op, ins.arg2, reg1, reg2, reg3, 0);
+            }
+            // variable = variable op constant
+            else if (is_in_data_storage(ins.result) && is_in_data_storage(ins.arg1) && is_digit(ins.arg2))
+            {
+                add_assembly_line("ld %s, %s(r0)\n", reg1->name, ins.arg1);
+                add_assembly_line("daddiu %s, r0, %s\n", reg2->name, ins.arg2);
+
+                perform_operation(ins.result, ins.arg1, ins.op, ins.arg2, reg1, reg2, reg3, 0);
+            }
+            // variable = constant op variable
+            else if (is_in_data_storage(ins.result) && is_digit(ins.arg1) && is_in_data_storage(ins.arg2))
+            {
+                add_assembly_line("daddiu %s, r0, %s\n", reg1->name, ins.arg1);
+                add_assembly_line("ld %s, %s(r0)\n", reg2->name, ins.arg2);
+
+                perform_operation(ins.result, ins.arg1, ins.op, ins.arg2, reg1, reg2, reg3, 0);
+            }
+            // variable = temp op temp
+            else if (is_in_data_storage(ins.result) && is_tac_temporary(ins.arg1) && is_tac_temporary(ins.arg2))
+            {
+                reg1->used = 0;
+                reg2->used = 0;
+                reg3->used = 0;
+
+                reg1 = find_temp_reg(ins.arg1);
                 reg2 = find_temp_reg(ins.arg2);
-                if (!reg2)
-                {
-                    reg2 = get_available_register();
-                    reg2->used = 1;
-                    strcpy(reg2->assigned_temp, ins.arg2);
-                }
+                reg3 = get_available_register();
+
+                perform_operation(ins.result, ins.arg1, ins.op, ins.arg2, reg1, reg2, reg3, 0);
             }
-            else
+            // variable = temp op variable
+            else if (is_in_data_storage(ins.result) && is_tac_temporary(ins.arg1) && is_in_data_storage(ins.arg2))
             {
+                reg1->used = 0;
+                reg2->used = 0;
+                reg3->used = 0;
+
+                reg1 = find_temp_reg(ins.arg1);
+                reg1->used = 1;
                 reg2 = get_available_register();
                 reg2->used = 1;
+                reg3 = get_available_register();
+                reg3->used = 1;
+
                 add_assembly_line("ld %s, %s(r0)\n", reg2->name, ins.arg2);
-            }
 
-            perform_operation(ins.result, ins.arg1, ins.op, ins.arg2, reg1, reg2, reg3, is_tac_temporary(ins.result));
-        }
-        else // simple assignment
-        {
-            if (is_digit(ins.arg1))
+                perform_operation(ins.result, ins.arg1, ins.op, ins.arg2, reg1, reg2, reg3, 0);
+            }
+            // variable = variable op temp
+            else if (is_in_data_storage(ins.result) && is_in_data_storage(ins.arg1) && is_tac_temporary(ins.arg2))
             {
+                reg1->used = 0;
+                reg2->used = 0;
+                reg3->used = 0;
+
                 reg1 = get_available_register();
                 reg1->used = 1;
-                add_assembly_line("daddiu %s, r0, %s\n", reg1->name, ins.arg1);
-            }
-            else if (is_tac_temporary(ins.arg1))
-            {
-                reg1 = find_temp_reg(ins.arg1);
-                if (!reg1)
-                {
-                    reg1 = get_available_register();
-                    reg1->used = 1;
-                    strcpy(reg1->assigned_temp, ins.arg1);
-                }
-            }
-            else
-            {
-                reg1 = get_available_register();
-                reg1->used = 1;
+                reg2 = find_temp_reg(ins.arg2);
+                reg2->used = 1;
+                reg3 = get_available_register();
+                reg3->used = 1;
+
                 add_assembly_line("ld %s, %s(r0)\n", reg1->name, ins.arg1);
-            }
 
-            if (is_tac_temporary(ins.result))
-            {
-                strcpy(reg1->assigned_temp, ins.result);
+                perform_operation(ins.result, ins.arg1, ins.op, ins.arg2, reg1, reg2, reg3, 0);
             }
-            else
+            // variable = temp op constant
+            else if (is_in_data_storage(ins.result) && is_tac_temporary(ins.arg1) && is_digit(ins.arg2))
             {
-                add_assembly_line("sd %s, %s(r0)\n", reg1->name, ins.result);
-            }
+                reg1->used = 0;
+                reg2->used = 0;
+                reg3->used = 0;
 
-            reg1->used = 0;
+                reg1 = find_temp_reg(ins.arg1);
+                reg1->used = 1;
+                reg2 = get_available_register();
+                reg2->used = 1;
+                reg3 = get_available_register();
+                reg3->used = 1;
+
+                add_assembly_line("daddiu %s, r0, %s\n", reg2->name, ins.arg2);
+
+                perform_operation(ins.result, ins.arg1, ins.op, ins.arg2, reg1, reg2, reg3, 0);
+            }
+            // variable = constant op temp
+            else if (is_in_data_storage(ins.result) && is_digit(ins.arg1) && is_tac_temporary(ins.arg2))
+            {
+                reg1->used = 0;
+                reg2->used = 0;
+                reg3->used = 0;
+
+                reg1 = get_available_register();
+                reg1->used = 1;
+                reg2 = find_temp_reg(ins.arg2);
+                reg2->used = 1;
+                reg3 = get_available_register();
+                reg3->used = 1;
+
+                add_assembly_line("daddiu %s, r0, %s\n", reg1->name, ins.arg1);
+
+                perform_operation(ins.result, ins.arg1, ins.op, ins.arg2, reg1, reg2, reg3, 0);
+            }
+            // temp = constant op constant
+            else if (is_tac_temporary(ins.result) && is_digit(ins.arg1) && is_digit(ins.arg2))
+            {
+                add_assembly_line("daddiu %s, r0, %s\n", reg1->name, ins.arg1);
+                add_assembly_line("daddiu %s, r0, %s\n", reg2->name, ins.arg2);
+
+                perform_operation(ins.result, ins.arg1, ins.op, ins.arg2, reg1, reg2, reg3, 1);
+            }
+            // temp = constant op temp
+            else if (is_tac_temporary(ins.result) && is_digit(ins.arg1) && is_tac_temporary(ins.arg2))
+            {
+                reg1->used = 0;
+                reg2->used = 0;
+                reg3->used = 0;
+
+                reg1 = get_available_register();
+                reg1->used = 1;
+                reg2 = find_temp_reg(ins.arg2);
+                reg2->used = 1;
+                reg3 = get_available_register();
+                reg3->used = 1;
+
+                add_assembly_line("daddiu %s, r0, %s\n", reg1->name, ins.arg1);
+
+                perform_operation(ins.result, ins.arg1, ins.op, ins.arg2, reg1, reg2, reg3, 1);
+            }
+            // temp = temp op constant
+            else if (is_tac_temporary(ins.result) && is_tac_temporary(ins.arg1) && is_digit(ins.arg2))
+            {
+                reg1->used = 0;
+                reg2->used = 0;
+                reg3->used = 0;
+
+                reg1 = find_temp_reg(ins.arg1);
+                reg1->used = 1;
+                reg2 = get_available_register();
+                reg2->used = 1;
+                reg3 = get_available_register();
+                reg3->used = 1;
+
+                add_assembly_line("daddiu %s, r0, %s\n", reg2->name, ins.arg2);
+
+                perform_operation(ins.result, ins.arg1, ins.op, ins.arg2, reg1, reg2, reg3, 1);
+            }
+            // temp = constant op variable
+            else if (is_tac_temporary(ins.result) && is_digit(ins.arg1) && is_in_data_storage(ins.arg2))
+            {
+                add_assembly_line("daddiu %s, r0, %s\n", reg1->name, ins.arg1);
+                add_assembly_line("ld %s, %s(r0)\n", reg2->name, ins.arg2);
+
+                perform_operation(ins.result, ins.arg1, ins.op, ins.arg2, reg1, reg2, reg3, 1);
+            }
+            // temp = variable op constant
+            else if (is_tac_temporary(ins.result) && is_in_data_storage(ins.arg1) && is_digit(ins.arg2))
+            {
+                add_assembly_line("ld %s, %s(r0)\n", reg1->name, ins.arg1);
+                add_assembly_line("daddiu %s, r0, %s\n", reg2->name, ins.arg2);
+
+                perform_operation(ins.result, ins.arg1, ins.op, ins.arg2, reg1, reg2, reg3, 1);
+            }
+            // temp = variable op variable
+            else if (is_tac_temporary(ins.result) && is_in_data_storage(ins.arg1) && is_in_data_storage(ins.arg2))
+            {
+                add_assembly_line("ld %s, %s(r0)\n", reg1->name, ins.arg1);
+                add_assembly_line("ld %s, %s(r0)\n", reg2->name, ins.arg2);
+
+                perform_operation(ins.result, ins.arg1, ins.op, ins.arg2, reg1, reg2, reg3, 1);
+            }
+            // temp = temp op variable
+            else if (is_tac_temporary(ins.result) && is_tac_temporary(ins.arg1) && is_in_data_storage(ins.arg2))
+            {
+                reg1->used = 0;
+                reg2->used = 0;
+                reg3->used = 0;
+
+                reg1 = find_temp_reg(ins.arg1);
+                reg1->used = 1;
+                reg2 = get_available_register();
+                reg2->used = 1;
+                reg3 = get_available_register();
+                reg3->used = 1;
+
+                add_assembly_line("ld %s, %s(r0)\n", reg2->name, ins.arg2);
+
+                perform_operation(ins.result, ins.arg1, ins.op, ins.arg2, reg1, reg2, reg3, 1);
+            }
+            // temp = variable op temp
+            else if (is_tac_temporary(ins.result) && is_in_data_storage(ins.arg1) && is_tac_temporary(ins.arg2))
+            {
+                reg1->used = 0;
+                reg2->used = 0;
+                reg3->used = 0;
+
+                reg1 = get_available_register();
+                reg1->used = 1;
+                reg2 = find_temp_reg(ins.arg2);
+                reg2->used = 1;
+                reg3 = get_available_register();
+                reg3->used = 1;
+
+                add_assembly_line("ld %s, %s(r0)\n", reg1->name, ins.arg1);
+
+                perform_operation(ins.result, ins.arg1, ins.op, ins.arg2, reg1, reg2, reg3, 1);
+            }
+            // temp = temp op temp
+            else if (is_tac_temporary(ins.result) && is_tac_temporary(ins.arg1) && is_tac_temporary(ins.arg2))
+            {
+                reg1->used = 0;
+                reg2->used = 0;
+                reg3->used = 0;
+
+                reg1 = find_temp_reg(ins.arg1);
+                reg1->used = 1;
+                reg2 = find_temp_reg(ins.arg2);
+                reg2->used = 1;
+                reg3 = get_available_register();
+                reg3->used = 1;
+
+                perform_operation(ins.result, ins.arg1, ins.op, ins.arg2, reg1, reg2, reg3, 1);
+            }
         }
-
-        if (reg2)
-            reg2->used = 0;
-        if (reg3 && !is_tac_temporary(ins.result))
-            reg3->used = 0;
 
         add_assembly_line("\n");
     }
 }
 
-// === OUTPUT FILE ===
+// === OUTPUT FILE WITH PROPER HANDLING ===
 void output_assembly_file()
 {
     FILE *file = fopen("output_assembly.txt", "w");
     if (!file)
     {
-        printf("Error creating output file\n");
+        perror("Error creating output file");
         return;
     }
+
     for (int i = 0; i < assembly_code_count; i++)
         fprintf(file, "%s", assembly_code[i].assembly);
-    fclose(file);
+
+    if (fclose(file) != 0)
+        perror("Error closing output file");
+    else
+        printf(">> Assembly code successfully written to output_assembly.txt\n");
 }
 
 // === TARGET CODE GENERATION ===
