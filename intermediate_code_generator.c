@@ -232,7 +232,7 @@ static void removeRedundantTemporaries()
         if (strncmp(cur->result, "temp", 4) == 0 && strlen(cur->op) > 0)
         {
             // Look ahead to find single copy
-            for (int k = i+1; k < codeCount; k++)
+            for (int k = i + 1; k < codeCount; k++)
             {
                 TACInstruction *next = &code[k];
                 if (strcmp(next->arg1, cur->result) == 0 && strcmp(next->op, "=") == 0)

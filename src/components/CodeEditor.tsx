@@ -50,9 +50,12 @@ export function CodeEditor({
 
   const getBorderColor = () => (isDark ? 'border-gray-700/50' : 'border-gray-300/50');
 
+  const get_bg_color = () => (isDark ? '' : 'bg-white');
+
   return (
     <div className={`flex flex-col rounded-xl border ${getBorderColor()} backdrop-blur-sm overflow-hidden transition-colors
-                    shadow-md hover:shadow-lg`}>
+                    shadow-md hover:shadow-lg ${get_bg_color()}`}>
+
       {/* Header */}
       <div className={`flex items-center justify-between px-4 py-3 transition-colors
         ${isDark ? 'border-gray-800/50 bg-black/30' : 'border-gray-200/50 bg-white/50'}`}>
