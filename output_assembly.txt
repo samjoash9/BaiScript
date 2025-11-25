@@ -1,7 +1,13 @@
 .data
 a: .word64 0
+b: .word64 0
 
 .code
-; a = 'a'
-daddiu r1, r0, 97
-sd r1, a(r0)
+; a = 1
+daddiu r2, r0, 1
+sd r2, a(r0)
+
+; b = 2
+daddiu r2, r0, 2
+sd r2, b(r0)
+

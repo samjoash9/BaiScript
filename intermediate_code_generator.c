@@ -123,6 +123,43 @@ static char *generateExpression(ASTNode *node)
     return strdup(node->value ? node->value : "");
 }
 
+static void generateDeclarationList(ASTNode *node)
+{
+    if (!node) return;
+
+    // If node is a wrapper (multiple declarations), recurse
+    if (node->type == NODE_DECLARATION && node->value && strcmp(node->value, "DECL") == 0)
+    {
+        generateDeclarationList(node->left);
+        generateDeclarationList(node->right);
+        return;
+    }
+
+    // If node is a single INIT_DECL
+    if (node->type == NODE_DECLARATION && node->value && strcmp(node->value, "INIT_DECL") == 0)
+    {
+        if (node->left && node->left->type == NODE_IDENTIFIER)
+        {
+            char *ident = strdup(node->left->value);
+            char *rhs = NULL;
+            if (node->right)
+                rhs = generateExpression(node->right);
+            else
+                rhs = strdup("0");
+
+            emit(ident, rhs, "=", NULL);
+
+            free(rhs);
+            free(ident);
+        }
+        return;
+    }
+
+    // Safety: recurse to left/right if any
+    generateDeclarationList(node->left);
+    generateDeclarationList(node->right);
+}
+
 // === AST Walker / Code Generator ===
 static void generateCode(ASTNode *node)
 {
@@ -140,22 +177,7 @@ static void generateCode(ASTNode *node)
             break;
         case NODE_DECLARATION:
         {
-            ASTNode *cur = node->left;
-            while (cur)
-            {
-                if (cur->left && cur->right)
-                {
-                    char *ident = strdup(cur->left->value);
-                    char *rhs = generateExpression(cur->right);
-                    if (rhs)
-                    {
-                        emit(ident, rhs, "=", NULL);
-                        free(rhs);
-                    }
-                    free(ident);
-                }
-                cur = cur->right;
-            }
+            generateDeclarationList(node->left);
             break;
         }
         case NODE_ASSIGNMENT:

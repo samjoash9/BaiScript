@@ -633,84 +633,85 @@ static void handle_print(ASTNode *print_node)
     sem_inside_print = 0; // End print context
 }
 
-
-
-
 /* ----------------------------
    Declaration & assignment
-   ---------------------------- */
+---------------------------- */
 
 static void handle_declaration(ASTNode *decl_node)
 {
+    if (!decl_node) return;
+
     SEM_TYPE dtype = sem_type_from_string(decl_node->value);
-    ASTNode *decls = decl_node->left;
 
-    while (decls)
+    // Recursive helper
+    void process_decl(ASTNode *node)
     {
-        if (decls->type == NODE_IDENTIFIER)
-        {
-            const char *name = decls->value;
-            if (!name) { decls = decls->right; continue; }
+        if (!node) return;
+        if (node->type != NODE_DECLARATION) return;  // only NODE_DECLARATION here
 
+        ASTNode *idnode = node->left;   // left is the actual declarator (IDENTIFIER)
+        ASTNode *init_expr = NULL;
+
+        // If idnode itself is a NODE_DECLARATION "INIT_DECL", then init_expr is its right
+        if (idnode && strcmp(idnode->value, "INIT_DECL") == 0)
+        {
+            if (idnode->left) idnode = idnode->left;
+            if (node->left->right) init_expr = node->left->right;
+        }
+        else if (idnode && idnode->type == NODE_IDENTIFIER)
+        {
+            init_expr = node->right;
+        }
+
+        if (idnode && idnode->type == NODE_IDENTIFIER)
+        {
+            const char *name = idnode->value;
             KnownVar *kv = sem_find_var(name);
             if (kv)
             {
-                sem_record_error(decls, "Redeclaration of variable '%s'", name);
+                sem_record_error(idnode, "Redeclaration of variable '%s'", name);
             }
             else
             {
                 kv = sem_add_var(name, dtype);
-
-                /* Attach declaration AST node for correct warning line */
-                kv->temp.node = decls;
-
-                /* Mark default initialization */
-                kv->initialized = 1;
-                kv->temp.is_constant = 1;
-                kv->temp.int_value = 0;
-
-                int idx = find_symbol(name);
-                if (idx != -1)
-                {
-                    symbol_table[idx].initialized = 1;
-                    symbol_table[idx].value_str[0] = '\0';
-                }
-            }
-        }
-        else if (decls->type == NODE_DECLARATION)
-        {
-            ASTNode *idnode = decls->left;
-            ASTNode *init_expr = decls->right;
-            if (!idnode || idnode->type != NODE_IDENTIFIER) { decls = decls->right; continue; }
-
-            const char *name = idnode->value;
-            KnownVar *kv = sem_find_var(name);
-            if (kv) sem_record_error(idnode, "Redeclaration of variable '%s'", name);
-            else
-            {
-                kv = sem_add_var(name, dtype);
-
-                /* Attach declaration AST node for correct warning line */
                 kv->temp.node = idnode;
 
-                SEM_TEMP val = evaluate_expression(init_expr);
-
-                kv->initialized = 1;
-                kv->temp.is_constant = val.is_constant;
-                kv->temp.int_value = val.is_constant ? val.int_value : 0;
-
-                int idx = find_symbol(name);
-                if (idx != -1)
+                if (init_expr)
                 {
-                    symbol_table[idx].initialized = 1;
-                    if (val.is_constant) snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", val.int_value);
+                    SEM_TEMP val = evaluate_expression(init_expr);
+                    kv->initialized = 1;
+                    kv->temp.is_constant = val.is_constant;
+                    kv->temp.int_value = val.is_constant ? val.int_value : 0;
+
+                    int idx = find_symbol(name);
+                    if (idx != -1)
+                    {
+                        symbol_table[idx].initialized = 1;
+                        if (val.is_constant)
+                            snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", val.int_value);
+                    }
+                }
+                else
+                {
+                    kv->initialized = 1;
+                    kv->temp.is_constant = 1;
+                    kv->temp.int_value = 0;
+
+                    int idx = find_symbol(name);
+                    if (idx != -1)
+                        snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%d", 0);
                 }
             }
         }
 
-        decls = decls->right;
+        // Recurse to next declaration in the chain
+        if (node->right)
+            process_decl(node->right);
     }
+
+    process_decl(decl_node->left);
 }
+
 
 static void handle_assignment(ASTNode *assign_node)
 {
@@ -816,10 +817,6 @@ static void check_unused_variables(void)
             sem_record_warning(node, "Variable '%s' declared but never used", k->name);
     }
 }
-
-/* ----------------------------
-   Public API
----------------------------- */
 
 /* ----------------------------
    Semantic analyzer
