@@ -1,11 +1,1 @@
-a = 3
-a = a + 1
-temp0 = a
-a = a + 1
-a = a + temp0
-b = 3
-c = 4
-c = c + 1
-temp2 = c
-c = c + 1
-c = c + temp2
+No TAC generated due to parse errors.
