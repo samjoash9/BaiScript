@@ -35,12 +35,10 @@ export function CodeEditor({
 
   const getEditorBg = () => {
     if (isDark) {
-      // Subtle gradient for dark mode
       return title.includes('Source')
         ? 'bg-gradient-to-br from-gray-900/40 to-gray-950/20'
         : 'bg-gradient-to-br from-gray-900/30 to-gray-950/15';
     } else {
-      // Pure white for light mode
       return 'bg-white';
     }
   };
@@ -52,13 +50,24 @@ export function CodeEditor({
 
   const get_bg_color = () => (isDark ? '' : 'bg-white');
 
+  // Calculate line numbers if the title is "Source"
+  const lines = title.includes('Source') ? value.split('\n') : [];
+
+  const handleScroll = (e: React.SyntheticEvent) => {
+    const textArea = e.target as HTMLTextAreaElement;
+    const lineNumbers = textArea.previousSibling as HTMLElement;
+    if (lineNumbers) {
+      lineNumbers.scrollTop = textArea.scrollTop;
+    }
+  };
+
   return (
     <div className={`flex flex-col rounded-xl border ${getBorderColor()} backdrop-blur-sm overflow-hidden transition-colors
                     shadow-md hover:shadow-lg ${get_bg_color()}`}>
 
       {/* Header */}
       <div className={`flex items-center justify-between px-4 py-3 transition-colors
-        ${isDark ? 'border-gray-800/50 bg-black/30' : 'border-gray-200/50 bg-white/50'}`}>
+        ${isDark ? 'border-gray-800/50 bg-black/30' : 'border-gray-300/70 bg-gray-200'}`}>
         <div className="flex items-center gap-2">
           {getIcon()}
           <div>
@@ -81,25 +90,44 @@ export function CodeEditor({
       </div>
 
       {/* Editor Area */}
-      <div className="flex-1 relative px-2">
+      <div className="flex-1 overflow-hidden relative">
+        {title.includes('Source') && (
+          <div className="absolute top-0 left-0 bottom-0 overflow-y-scroll no-scrollbar pr-2 w-12 text-center text-[14px] leading-[1.6] font-mono .no-scrollbar overflow-hidden">
+            {lines.map((_, index) => (
+              <div
+                key={index}
+                className={`${isDark ? 'text-gray-500' : 'text-gray-400'}`}
+              >
+                {index + 1}
+              </div>
+            ))}
+          </div>
+
+        )}
+
         <textarea
           value={value}
           onChange={(e) => onChange?.(e.target.value)}
           readOnly={readOnly}
           placeholder={placeholder}
           spellCheck={false}
-          className={`w-full h-full p-4 text-sm font-mono resize-none focus:outline-none transition-colors
-            ${getEditorBg()} ${getTextColor()} ${getPlaceholderColor()}
-            rounded-2xl border border-gray-400/30 shadow-inner focus:ring-1 focus:ring-gray-500/40`}
+          onScroll={handleScroll}
+          className={`
+          w-full h-full pl-9 pr-4 text-sm font-mono resize-none
+          overflow-y-scroll box-content
+          focus:outline-none transition-colors
+          ${getEditorBg()} ${getTextColor()} ${getPlaceholderColor()}
+          border-none shadow-inner rounded-none
+        `}
           style={{ lineHeight: '1.6', tabSize: 2 }}
         />
       </div>
 
       {/* Footer */}
       <div className={`flex items-center justify-between px-4 py-2 transition-colors
-        ${isDark ? 'border-gray-800/50 bg-black/30' : 'border-gray-200/50 bg-white/50'}`}>
+        ${isDark ? 'border-gray-800/50 bg-black/30' : 'border-gray-300/70 bg-gray-200'}`}>
         <span className={`text-xs transition-colors ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>
-          {value.split('\n').length} lines
+          {lines.length} lines
         </span>
         <span className={`text-xs transition-colors ${isDark ? 'text-gray-500' : 'text-gray-600'}`}>
           {value.length} characters

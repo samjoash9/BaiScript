@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
@@ -9,8 +9,8 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
-    frame: false, // Remove default window frame
-    titleBarStyle: 'hidden', // Hide title bar (macOS)
+    frame: false,
+    titleBarStyle: 'hidden',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -18,90 +18,85 @@ function createWindow() {
     },
   });
 
-  // Remove menu bar
-  mainWindow.setMenuBarVisibility(false);
+  Menu.setApplicationMenu(null);
 
-  // Load the app
-  // Check if we're in development mode (Vite dev server running)
   const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
   if (isDev) {
-    // Try to load from Vite dev server
-    mainWindow.loadURL('http://localhost:3000');
-    // DevTools are not opened automatically
+    const devPort = process.env.VITE_DEV_PORT || 3000;
+    const devUrl = `http://localhost:${devPort}`;
+    mainWindow.loadURL(devUrl);
 
-    // If dev server is not available, show error
     mainWindow.webContents.on('did-fail-load', () => {
-      console.log('Dev server not running. Please run "npm run dev" in another terminal.');
+      console.error(
+        `Failed to load dev server at ${devUrl}. Run "npm run dev" in another terminal.`
+      );
     });
+
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
-    // Production: load from build folder
-    mainWindow.loadFile(path.join(__dirname, '../build/index.html'));
+    const indexHtml = path.join(__dirname, '../build/index.html');
+    mainWindow.loadFile(indexHtml);
   }
 }
-
-// Remove default menu bar
-const { Menu } = require('electron');
-Menu.setApplicationMenu(null);
 
 app.whenReady().then(() => {
   createWindow();
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  if (process.platform !== 'darwin') app.quit();
 });
 
-// IPC handler to run the compiler
+// --------------------- IPC Handlers ---------------------
+
 ipcMain.handle('run-compiler', async (event, sourceCode) => {
   return new Promise((resolve, reject) => {
     try {
-      // Get the directory where main.exe is located
-      // Adjust this path based on where your main.exe is located
-      const exePath = path.join(__dirname, '../main.exe');
-      const inputPath = path.join(__dirname, '../input.txt');
-      const outputPrintPath = path.join(__dirname, '../output_print.txt');
-      const outputAssemblyPath = path.join(__dirname, '../output_assembly.txt');
-      const outputMachinePath = path.join(__dirname, '../output_machine.txt');
+      const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+
+      // Paths
+      const exePath = isDev
+        ? path.join(__dirname, '../main.exe')           // Dev mode
+        : path.join(process.resourcesPath, 'main.exe'); // Production
+
+      // Folder to store input/output files
+      const tempDir = isDev
+        ? path.join(__dirname, '..')    // Project root in dev
+        : app.getPath('userData');      // UserData folder in production
+
+      const inputPath = path.join(tempDir, 'input.txt');
+      const outputPrintPath = path.join(tempDir, 'output_print.txt');
+      const outputAssemblyPath = path.join(tempDir, 'output_assembly.txt');
+      const outputMachinePath = path.join(tempDir, 'output_machine.txt');
 
       // Write source code to input.txt
       fs.writeFileSync(inputPath, sourceCode, 'utf-8');
 
-      // Run main.exe
+      // Run compiler
       const compilerProcess = spawn(exePath, [], {
-        cwd: path.dirname(exePath),
+        cwd: tempDir, // Important: compiler reads/writes txt files here
         stdio: ['pipe', 'pipe', 'pipe'],
       });
 
       let stdout = '';
       let stderr = '';
 
-      compilerProcess.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
-
-      compilerProcess.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
+      compilerProcess.stdout.on('data', (data) => (stdout += data.toString()));
+      compilerProcess.stderr.on('data', (data) => (stderr += data.toString()));
 
       compilerProcess.on('close', (code) => {
         const safeRead = (filePath) => {
           try {
-            if (fs.existsSync(filePath)) {
-              return fs.readFileSync(filePath, 'utf-8');
-            }
+            return fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf-8') : '';
           } catch (err) {
             console.error(`Error reading ${filePath}:`, err);
+            return '';
           }
-          return '';
         };
 
         resolve({
@@ -118,44 +113,20 @@ ipcMain.handle('run-compiler', async (event, sourceCode) => {
       });
 
       compilerProcess.on('error', (error) => {
-        reject({
-          success: false,
-          error: error.message,
-        });
+        reject({ success: false, error: error.message });
       });
     } catch (error) {
-      reject({
-        success: false,
-        error: error.message,
-      });
+      reject({ success: false, error: error.message });
     }
   });
 });
 
-// Window control handlers
-ipcMain.handle('window-minimize', () => {
-  if (mainWindow) {
-    mainWindow.minimize();
-  }
-});
+// ----------------- Window Controls -----------------
 
+ipcMain.handle('window-minimize', () => mainWindow?.minimize());
 ipcMain.handle('window-maximize', () => {
-  if (mainWindow) {
-    if (mainWindow.isMaximized()) {
-      mainWindow.unmaximize();
-    } else {
-      mainWindow.maximize();
-    }
-  }
+  if (!mainWindow) return;
+  mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize();
 });
-
-ipcMain.handle('window-close', () => {
-  if (mainWindow) {
-    mainWindow.close();
-  }
-});
-
-ipcMain.handle('window-is-maximized', () => {
-  return mainWindow ? mainWindow.isMaximized() : false;
-});
-
+ipcMain.handle('window-close', () => mainWindow?.close());
+ipcMain.handle('window-is-maximized', () => mainWindow?.isMaximized() || false);

@@ -30,7 +30,7 @@ typedef struct
     unsigned int machine_hex;
 } MachineCodeEntry;
 
-MachineCodeEntry machine_code_list[500];
+MachineCodeEntry machine_code_list[9999];
 int machine_code_count = 0;
 
 /* ===================== HELPERS ===================== */
@@ -38,10 +38,13 @@ int machine_code_count = 0;
 void trim(char *str)
 {
     char *end;
-    while (isspace((unsigned char)*str)) str++;
-    if (*str == 0) return;
+    while (isspace((unsigned char)*str))
+        str++;
+    if (*str == 0)
+        return;
     end = str + strlen(str) - 1;
-    while (end > str && isspace((unsigned char)*end)) end--;
+    while (end > str && isspace((unsigned char)*end))
+        end--;
     *(end + 1) = 0;
 }
 
@@ -64,24 +67,37 @@ int parse_register(const char *token)
 
 int get_opcode(const char *mnemonic)
 {
-    if (!strcmp(mnemonic, "daddu")) return 0x00;
-    if (!strcmp(mnemonic, "dsub"))  return 0x00;
-    if (!strcmp(mnemonic, "dmult")) return 0x00;
-    if (!strcmp(mnemonic, "ddiv"))  return 0x00;
-    if (!strcmp(mnemonic, "mflo"))  return 0x00;
-    if (!strcmp(mnemonic, "daddiu")) return 0x19;
-    if (!strcmp(mnemonic, "ld"))    return 0x37;
-    if (!strcmp(mnemonic, "sd"))    return 0x3F;
+    if (!strcmp(mnemonic, "daddu"))
+        return 0x00;
+    if (!strcmp(mnemonic, "dsub"))
+        return 0x00;
+    if (!strcmp(mnemonic, "dmult"))
+        return 0x00;
+    if (!strcmp(mnemonic, "ddiv"))
+        return 0x00;
+    if (!strcmp(mnemonic, "mflo"))
+        return 0x00;
+    if (!strcmp(mnemonic, "daddiu"))
+        return 0x19;
+    if (!strcmp(mnemonic, "ld"))
+        return 0x37;
+    if (!strcmp(mnemonic, "sd"))
+        return 0x3F;
     return 0;
 }
 
 int get_funct(const char *mnemonic)
 {
-    if (!strcmp(mnemonic, "daddu")) return 0x2D;
-    if (!strcmp(mnemonic, "dsub"))  return 0x2E;
-    if (!strcmp(mnemonic, "dmult")) return 0x1C;
-    if (!strcmp(mnemonic, "ddiv"))  return 0x1E;
-    if (!strcmp(mnemonic, "mflo"))  return 0x12;
+    if (!strcmp(mnemonic, "daddu"))
+        return 0x2D;
+    if (!strcmp(mnemonic, "dsub"))
+        return 0x2E;
+    if (!strcmp(mnemonic, "dmult"))
+        return 0x1C;
+    if (!strcmp(mnemonic, "ddiv"))
+        return 0x1E;
+    if (!strcmp(mnemonic, "mflo"))
+        return 0x12;
     return 0;
 }
 
@@ -131,7 +147,8 @@ void convert_to_machine_code()
     {
         assembly_code[i].assembly[strcspn(assembly_code[i].assembly, "\n")] = '\0';
 
-        if (strstr(assembly_code[i].assembly, ";")) continue;
+        if (strstr(assembly_code[i].assembly, ";"))
+            continue;
 
         if (sscanf(assembly_code[i].assembly, "%31s %[^\n]", mnemonic, operands) < 1)
             continue;
@@ -147,28 +164,35 @@ void convert_to_machine_code()
         if (!strcmp(mnemonic, "mflo"))
         {
             tok = strtok(operands, ", ");
-            if (tok) rd = parse_register(tok);
+            if (tok)
+                rd = parse_register(tok);
         }
         else if (!strcmp(mnemonic, "dmult") || !strcmp(mnemonic, "ddiv"))
         {
             tok = strtok(operands, ", ");
-            if (tok) rs = parse_register(tok);
+            if (tok)
+                rs = parse_register(tok);
             tok = strtok(NULL, ", ");
-            if (tok) rt = parse_register(tok);
+            if (tok)
+                rt = parse_register(tok);
         }
         else if (opcode == 0) /* R-type */
         {
             tok = strtok(operands, ", ");
-            if (tok) rd = parse_register(tok);
+            if (tok)
+                rd = parse_register(tok);
             tok = strtok(NULL, ", ");
-            if (tok) rs = parse_register(tok);
+            if (tok)
+                rs = parse_register(tok);
             tok = strtok(NULL, ", ");
-            if (tok) rt = parse_register(tok);
+            if (tok)
+                rt = parse_register(tok);
         }
         else /* I-type */
         {
             tok = strtok(operands, ", ");
-            if (tok) rt = parse_register(tok);
+            if (tok)
+                rt = parse_register(tok);
 
             tok = strtok(NULL, ", ");
             if (tok)
@@ -195,13 +219,15 @@ void convert_to_machine_code()
                         }
                     }
 
-                    if (!found) imm = atoi(tok);
+                    if (!found)
+                        imm = atoi(tok);
                 }
                 else
                 {
                     rs = parse_register(tok);
                     tok = strtok(NULL, ", ");
-                    if (tok) imm = atoi(tok);
+                    if (tok)
+                        imm = atoi(tok);
                 }
             }
         }
@@ -235,7 +261,7 @@ void convert_to_machine_code()
 
         /* Console Output */
         printf("%-25s -> %s (0x%08X)\n",
-            assembly_code[i].assembly, full_bin, hex_val);
+               assembly_code[i].assembly, full_bin, hex_val);
     }
 }
 
@@ -244,7 +270,11 @@ void convert_to_machine_code()
 void output_machine_file()
 {
     FILE *f = fopen("output_machine.txt", "w");
-    if (!f) { printf("ERROR: Cannot write output file!\n"); return; }
+    if (!f)
+    {
+        printf("ERROR: Cannot write output file!\n");
+        return;
+    }
 
     for (int i = 0; i < machine_code_count; i++)
     {

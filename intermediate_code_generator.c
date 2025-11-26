@@ -26,24 +26,43 @@ TACInstruction *getOptimizedCode(int *count)
 
 static int is_char_literal(const char *s, char *out)
 {
-    if (!s || !out) return 0;
+    if (!s || !out)
+        return 0;
     size_t len = strlen(s);
-    if (len >= 3 && s[0] == '\'' && s[len-1] == '\'')
+    if (len >= 3 && s[0] == '\'' && s[len - 1] == '\'')
     {
-        if (len == 3) {
+        if (len == 3)
+        {
             *out = s[1]; // e.g., 'A' -> A
             return 1;
         }
-        else if (len == 4 && s[1] == '\\') { // escape sequences
-            switch (s[2]) {
-                case 'n': *out = '\n'; return 1;
-                case 't': *out = '\t'; return 1;
-                case 'r': *out = '\r'; return 1;
-                case '0': *out = '\0'; return 1;
-                case '\\': *out = '\\'; return 1;
-                case '\'': *out = '\''; return 1;
-                case '"': *out = '"'; return 1;
-                default: return 0;
+        else if (len == 4 && s[1] == '\\')
+        { // escape sequences
+            switch (s[2])
+            {
+            case 'n':
+                *out = '\n';
+                return 1;
+            case 't':
+                *out = '\t';
+                return 1;
+            case 'r':
+                *out = '\r';
+                return 1;
+            case '0':
+                *out = '\0';
+                return 1;
+            case '\\':
+                *out = '\\';
+                return 1;
+            case '\'':
+                *out = '\'';
+                return 1;
+            case '"':
+                *out = '"';
+                return 1;
+            default:
+                return 0;
             }
         }
     }
