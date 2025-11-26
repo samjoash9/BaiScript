@@ -191,22 +191,31 @@ KnownVar *sem_add_var(const char *name, SEM_TYPE type)
     KnownVar *k = (KnownVar *)malloc(sizeof(KnownVar));
     k->name = strdup(name);
     k->temp = sem_new_temp(type);
-    k->initialized = 0;
     k->used = 0;
     k->next = known_vars_head;
     known_vars_head = k;
 
-    // For KUAN, default type string in symbol table is "KUAN" initially
+    // --- Initialize INT / CHAR by default ---
+    if (type == SEM_TYPE_INT || type == SEM_TYPE_CHAR) {
+        k->initialized = 1;
+        k->temp.is_constant = 1;
+        k->temp.int_value = 0;
+    } else {
+        k->initialized = 0;
+    }
+
+    // Add to symbol table if not exists
     const char *dtype_str = "KUAN";
     if (type == SEM_TYPE_INT) dtype_str = "ENTEGER";
     else if (type == SEM_TYPE_CHAR) dtype_str = "CHAROT";
 
     int idx = find_symbol(name);
-    if (idx == -1)
-        add_symbol(name, dtype_str, 0, NULL);
+    if (idx == -1) add_symbol(name, dtype_str, k->initialized, 
+        k->initialized ? NULL : NULL); // optional: store value_str later
 
     return k;
 }
+
 
 
 SEM_TYPE sem_type_from_string(const char *s)
@@ -536,6 +545,72 @@ static SEM_TEMP evaluate_expression(ASTNode *node)
 
             return ret;
         }
+
+    case NODE_ASSIGNMENT:
+    {
+        ASTNode *lhs = node->left;
+        ASTNode *rhs = node->right;
+
+        if (!lhs || lhs->type != NODE_IDENTIFIER) {
+            sem_record_error(node, "Left side of assignment is not an identifier");
+            return sem_new_temp(SEM_TYPE_UNKNOWN);
+        }
+
+        const char *name = lhs->value;
+        KnownVar *kv = sem_add_var(name, SEM_TYPE_INT);
+
+        const char *op = node->value ? node->value : "=";
+
+        // Evaluate RHS expression first
+        SEM_TEMP rval = evaluate_expression(rhs);
+
+        long oldval = 0;
+        if (strcmp(op, "=") != 0)   // compound assignment requires reading old value
+        {
+            if (!kv->initialized)
+                sem_record_error(node, "Use of uninitialized variable '%s' in compound assignment", name);
+
+            oldval = kv->temp.is_constant ? kv->temp.int_value : 0;
+        }
+
+        long newval = rval.int_value;
+
+        // Handle compound operators
+        if      (strcmp(op, "+=") == 0) newval = oldval + rval.int_value;
+        else if (strcmp(op, "-=") == 0) newval = oldval - rval.int_value;
+        else if (strcmp(op, "*=") == 0) newval = oldval * rval.int_value;
+        else if (strcmp(op, "/=") == 0) {
+            if (rval.int_value == 0)
+                sem_record_error(node, "Division by zero");
+            else
+                newval = oldval / rval.int_value;
+        }
+        else if (strcmp(op, "=") == 0) {
+            // simple assignment, already handled
+        }
+        else {
+            sem_record_error(node, "Unknown assignment operator '%s'", op);
+        }
+
+        // Assign result
+        kv->initialized = 1;
+        kv->temp.is_constant = 1;
+        kv->temp.int_value = newval;
+
+        int idx = find_symbol(name);
+        if (idx != -1) {
+            symbol_table[idx].initialized = 1;
+            snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", newval);
+        }
+
+        SEM_TEMP ret = sem_new_temp(SEM_TYPE_INT);
+        ret.is_constant = 1;
+        ret.int_value = newval;
+        ret.node = node;
+
+        return ret;
+    }
+
         case NODE_IDENTIFIER:
         case NODE_LITERAL: return eval_factor(node);
         default:
@@ -634,128 +709,58 @@ static void handle_print(ASTNode *print_node)
 /* ----------------------------
    Declaration & assignment
 ---------------------------- */
-
-/* ----------------------------
-   Handle declaration AST node
-   (for your tyacc-generated AST)
----------------------------- */
-void handle_declaration(ASTNode *decl_node)
+void handle_declaration(ASTNode *decl_node, SEM_TYPE dtype)
 {
     if (!decl_node) return;
 
-    // Determine the datatype (from parent DECLARATION node)
-    SEM_TYPE dtype = sem_type_from_string(decl_node->value);
-
-    // Recursive helper to traverse DECL / INIT_DECL
-    void process_decl(ASTNode *node)
+    // If this node is an identifier
+    if (decl_node->type == NODE_IDENTIFIER)
     {
-        if (!node) return;
-
-        if ((node->type == NODE_DECLARATION) && 
-            (node->value && (strcmp(node->value, "DECL") == 0 || strcmp(node->value, "INIT_DECL") == 0)))
+        const char *name = decl_node->value;
+        KnownVar *kv = sem_add_var(name, dtype);
+        if (!kv)
         {
-            // Left child may be identifier or another DECL/INIT_DECL
-            if (node->left)
-            {
-                if (node->left->type == NODE_IDENTIFIER)
-                {
-                    const char *name = node->left->value;
-
-                    // Check redeclaration
-                    KnownVar *kv = sem_find_var(name);
-                    if (kv)
-                    {
-                        sem_record_error(node->left, "Redeclaration of variable '%s'", name);
-                    }
-                    else
-                    {
-                        kv = sem_add_var(name, dtype);
-                        kv->temp.node = node->left;
-
-                        // Handle initializer if exists
-                        if (strcmp(node->value, "INIT_DECL") == 0 && node->right)
-                        {
-                            SEM_TEMP val = evaluate_expression(node->right);
-
-                            // Infer type if KUAN
-                            if (dtype == SEM_TYPE_UNKNOWN)
-                            {
-                                if (val.type == SEM_TYPE_INT)
-                                    dtype = SEM_TYPE_INT;
-                                else if (val.type == SEM_TYPE_CHAR)
-                                    dtype = SEM_TYPE_CHAR;
-                            }
-
-                            // Only infer type if KUAN / UNKNOWN
-                            if (kv->temp.type == SEM_TYPE_UNKNOWN)
-                            {
-                                if (val.type == SEM_TYPE_CHAR)
-                                    kv->temp.type = SEM_TYPE_CHAR;
-                                else if (val.type == SEM_TYPE_INT)
-                                    kv->temp.type = SEM_TYPE_INT;
-                                else
-                                    kv->temp.type = SEM_TYPE_UNKNOWN;  // fallback
-                            }
-
-                            kv->initialized = 1;
-                            kv->temp.is_constant = val.is_constant;
-                            kv->temp.int_value = val.is_constant ? val.int_value : 0;
-
-                            int idx = find_symbol(name);
-                            if (idx != -1)
-                            {
-                                symbol_table[idx].initialized = 1;
-                                if (val.is_constant)
-                                    snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", val.int_value);
-                            }
-                        }
-
-                        else
-                        {
-                            // Default initialization to 0
-                            kv->initialized = 1;
-                            kv->temp.is_constant = 1;
-                            kv->temp.int_value = 0;
-
-                            int idx = find_symbol(name);
-                            if (idx != -1)
-                                snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%d", 0);
-                        }
-                    }
-                }
-                else
-                {
-                    // Left is nested DECL → recurse
-                    process_decl(node->left);
-                }
-            }
-
-            // Right child may hold comma-separated declarations
-            if (node->right && node->right->type == NODE_DECLARATION &&
-                node->right->value &&
-                (strcmp(node->right->value, "DECL") == 0 || strcmp(node->right->value, "INIT_DECL") == 0))
-            {
-                process_decl(node->right);
-            }
-
+            sem_record_error(decl_node, "Redeclaration of variable '%s'", name);
+            return;
         }
-        else if (node->type == NODE_IDENTIFIER)
+
+        // Default initialize INT/CHAR
+        if (dtype == SEM_TYPE_INT || dtype == SEM_TYPE_CHAR)
         {
-            const char *name = node->value;
-            KnownVar *kv = sem_find_var(name);
-            if (kv)
-            {
-                sem_record_error(node, "Redeclaration of variable '%s'", name);
-            }
-            else
-            {
-                kv = sem_add_var(name, dtype);
-            }
+            kv->temp.is_constant = 1;
+            kv->temp.int_value = 0;
         }
+
+        kv->initialized = 1;
+        return;
     }
 
-    process_decl(decl_node->left);
+    // If this node is an initialized declaration
+    if (decl_node->type == NODE_DECLARATION && strcmp(decl_node->value, "INIT_DECL") == 0)
+    {
+        const char *name = decl_node->left->value;
+        ASTNode *init_expr = decl_node->right;
+
+        KnownVar *kv = sem_add_var(name, dtype);
+        if (!kv)
+        {
+            sem_record_error(decl_node, "Redeclaration of variable '%s'", name);
+            return;
+        }
+
+        // Evaluate initializer
+        SEM_TEMP val = evaluate_expression(init_expr);
+        kv->temp.is_constant = val.is_constant;
+        kv->temp.int_value = val.is_constant ? val.int_value : 0;
+        kv->initialized = 1;
+        return;
+    }
+
+    // Otherwise, recursively handle left and right subtrees
+    handle_declaration(decl_node->left, dtype);
+    handle_declaration(decl_node->right, dtype);
 }
+
 
 
 
@@ -832,8 +837,20 @@ static void analyze_node(ASTNode *node)
             apply_deferred_ops(); // harmless (not used in current immediate semantics)
             break;
         case NODE_DECLARATION:
-            handle_declaration(node);
+        {
+            // Determine the type (ENTEGER / CHAR / etc)
+            SEM_TYPE dtype = SEM_TYPE_INT; // default
+            if (node->value) {
+                if (strcmp(node->value, "ENTEGER") == 0) dtype = SEM_TYPE_INT;
+                else if (strcmp(node->value, "CHAR") == 0) dtype = SEM_TYPE_CHAR;
+            }
+
+            // Pass dtype to recursive handler
+            handle_declaration(node->left, dtype);
+
             apply_deferred_ops();
+            break;
+        }
             break;
         case NODE_ASSIGNMENT:
             handle_assignment(node);

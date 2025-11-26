@@ -1,2 +1,245 @@
-ENTEGER f = 'B'!
-PRENT 'A' - f!
+//////////////////////////////
+// TEST 1: Basic Declaration
+//////////////////////////////
+ENTEGER A1!
+ENTEGER A2!
+ENTEGER A3!
+
+PRENT A1!
+PRENT A2!
+PRENT A3!
+
+
+//////////////////////////////
+// TEST 2: Declaration with Initialization
+//////////////////////////////
+ENTEGER B1 = 10!
+ENTEGER B2 = 5!
+ENTEGER B3 = B1!
+
+PRENT B1!
+PRENT B2!
+PRENT B3!
+
+
+//////////////////////////////
+// TEST 3: Multiple Declarations
+//////////////////////////////
+ENTEGER C1, C2, C3!
+PRENT C1!
+PRENT C2!
+PRENT C3!
+
+
+//////////////////////////////
+// TEST 4: Multiple Init Declarations
+//////////////////////////////
+ENTEGER D1 = 1, D2, D3 = 5!
+PRENT D1!
+PRENT D2!
+PRENT D3!
+
+
+//////////////////////////////
+// TEST 5: Simple Assignment
+//////////////////////////////
+ENTEGER E1 = 1!
+E1 = 5!
+PRENT E1!
+
+
+//////////////////////////////
+// TEST 6: Chained Assignment
+//////////////////////////////
+ENTEGER F1, F2, F3!
+F1 = F2 = F3 = 7!
+PRENT F1!
+PRENT F2!
+PRENT F3!
+
+
+//////////////////////////////
+// TEST 7: Arithmetic Operations
+//////////////////////////////
+ENTEGER G1 = 3!
+ENTEGER G2 = 4!
+ENTEGER G3!
+
+G3 = G1 + G2!
+PRENT G3!
+
+G3 = G1 * G2!
+PRENT G3!
+
+G3 = G2 - G1!
+PRENT G3!
+
+G3 = G2 / G1!
+PRENT G3!
+
+
+//////////////////////////////
+// TEST 8: Constant Folding
+//////////////////////////////
+PRENT 1 + 2 * 3!
+PRENT (1 + 2) * 3!
+PRENT 10 - (2 + 3)!
+PRENT 100 / 5 + 6!
+
+
+//////////////////////////////
+// TEST 9: Prefix Increment / Decrement
+//////////////////////////////
+ENTEGER H1 = 5!
+PRENT ++H1!
+PRENT H1!
+
+PRENT --H1!
+PRENT H1!
+
+
+//////////////////////////////
+// TEST 10: Postfix Increment / Decrement
+//////////////////////////////
+ENTEGER I1 = 5!
+PRENT I1++!
+PRENT I1!
+
+PRENT I1--!
+PRENT I1!
+
+
+//////////////////////////////
+// TEST 11: Prefix + Postfix Mixed
+//////////////////////////////
+ENTEGER J1 = 1!
+PRENT ++J1 + J1++!
+PRENT J1!
+
+
+//////////////////////////////
+// TEST 12: Compound Assignment
+//////////////////////////////
+ENTEGER K1 = 10!
+
+K1 += 5!
+PRENT K1!
+
+K1 -= 3!
+PRENT K1!
+
+K1 *= 2!
+PRENT K1!
+
+K1 /= 4!
+PRENT K1!
+
+
+//////////////////////////////
+// TEST 13: Compound Assignment with Expression
+//////////////////////////////
+ENTEGER L1 = 10!
+ENTEGER L2 = 2!
+
+L1 += L2 + 3!
+PRENT L1!
+
+L1 *= L2 + L1!
+PRENT L1!
+
+
+//////////////////////////////
+// TEST 14: Assignment Using Expressions
+//////////////////////////////
+ENTEGER M1 = 5!
+ENTEGER M2 = 3!
+ENTEGER M3!
+
+M3 = M1 + M2 * 2!
+PRENT M3!
+
+M3 = (M1 + M2) * 2!
+PRENT M3!
+
+
+//////////////////////////////
+// TEST 15: Char Literals
+//////////////////////////////
+CHAROT N1 = 'A'!
+PRENT N1!
+
+CHAROT N2 = 'b'!
+PRENT N2!
+
+CHAROT N3 = '0'!
+PRENT N3!
+
+
+//////////////////////////////
+// TEST 16: Char in Expressions
+//////////////////////////////
+CHAROT O1 = 'A'!
+ENTEGER O2 = 5!
+
+PRENT O1 + O2!
+PRENT O2 + O1!
+PRENT O1 + 5!
+
+
+//////////////////////////////
+// TEST 17: Mixed int + char Assignment
+//////////////////////////////
+ENTEGER P1!
+CHAROT P2 = 'C'!
+
+P1 = P2!
+PRENT P1!
+
+P1 = P2 + 3!
+PRENT P1!
+
+
+// TEST 3: Multiple Declarations
+//////////////////////////////
+ENTEGER C1, C2, C3!
+PRENT C1!
+PRENT C2!
+PRENT C3!
+
+//////////////////////////////
+// TEST 4: Multiple Init Declarations
+//////////////////////////////
+ENTEGER D1 = 1, D2, D3 = 5!
+PRENT D1!
+PRENT D2!
+PRENT D3!
+
+//////////////////////////////
+// TEST 18: Uninitialized Variables in PRENT (allowed)
+//////////////////////////////
+ENTEGER Q1, Q2, Q3!
+
+PRENT Q1!
+PRENT Q2!
+PRENT Q3!
+
+
+
+//////////////////////////////
+// TEST 19: Mixed Prefix/Postfix in Assignment
+//////////////////////////////
+ENTEGER R1 = 1!
+ENTEGER R2 = 2!
+
+R2 = ++R1 + R2++!
+PRENT R1!
+PRENT R2!
+
+
+//////////////////////////////
+// TEST 20: Nested Parentheses
+//////////////////////////////
+ENTEGER S1 = 2!
+ENTEGER S2 = 3!
+
+PRENT (((S1 + S2) * 2) + (S1 * (S2 + 1)))!
