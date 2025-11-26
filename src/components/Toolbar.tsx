@@ -1,5 +1,6 @@
 import { File, FolderOpen, Save, Download, Upload, Zap } from 'lucide-react';
 
+
 export function Toolbar({
   onImport,
   onExport,
@@ -13,8 +14,8 @@ export function Toolbar({
 
   return (
     <div className={`border-b backdrop-blur-sm transition-colors ${isDark
-      ? 'border-gray-800 bg-gradient-to-r from-gray-900/50 to-black/50'
-      : 'border-gray-200 bg-gradient-to-r from-gray-50/80 to-white/80'
+      ? 'border-gray-800 bg-black/50'
+      : 'border-gray-300/70 bg-gray-200'
       }`}>
       <div className="flex items-center gap-1 px-4 py-2">
         <div className={`w-px h-6 mx-2 transition-colors ${isDark ? 'bg-gray-800' : 'bg-gray-300'}`} />

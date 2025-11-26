@@ -124,7 +124,10 @@ export default function App() {
 
       {/* Header */}
       <header
-        className={`border-b backdrop-blur-sm transition-colors ${theme === 'dark' ? 'border-gray-800 bg-black/50' : 'border-gray-200 bg-white/80'}`}
+        className={`border-b backdrop-blur-sm transition-colors ${theme === 'dark'
+          ? 'border-gray-800 bg-black/50'
+          : 'border-gray-300/70 bg-gray-200'
+          }`}
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
         <div className="flex items-center justify-between px-6 py-4">
@@ -142,7 +145,7 @@ export default function App() {
           <div className="flex items-center gap-3" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
             <button type="button" onClick={handleClear} className={`px-4 py-2 rounded-lg border transition-all ${theme === 'dark'
               ? 'border-gray-700 hover:border-gray-600 hover:bg-gray-800/50'
-              : 'border-gray-300 hover:border-gray-400 hover:bg-gray-100'}`}>
+              : 'border-gray-300/70 hover:border-gray-400 hover:bg-gray-100'}`}>
               Clear Output
             </button>
 
@@ -154,7 +157,7 @@ export default function App() {
 
             <button type="button" onClick={toggleTheme} className={`p-2 rounded-lg border transition-all ${theme === 'dark'
               ? 'border-gray-700 hover:border-gray-600 hover:bg-gray-800/50'
-              : 'border-gray-300 hover:border-gray-400 hover:bg-gray-100'}`}
+              : 'border-gray-300/70 hover:border-gray-400 hover:bg-gray-100'}`}
               title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
               {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
@@ -171,7 +174,6 @@ export default function App() {
         onExport={handleExport}  // ← pass your export function
         theme={theme}
       />
-
 
       {/* Main Content Grid */}
       <main className="grid grid-cols-2 grid-rows-2 gap-4 p-4 h-[calc(100vh-140px)]">
