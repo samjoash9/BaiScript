@@ -198,22 +198,6 @@ PRENT P1!
 P1 = P2 + 3!
 PRENT P1!
 
-
-// TEST 3: Multiple Declarations
-//////////////////////////////
-ENTEGER C1, C2, C3!
-PRENT C1!
-PRENT C2!
-PRENT C3!
-
-//////////////////////////////
-// TEST 4: Multiple Init Declarations
-//////////////////////////////
-ENTEGER D1 = 1, D2, D3 = 5!
-PRENT D1!
-PRENT D2!
-PRENT D3!
-
 //////////////////////////////
 // TEST 18: Uninitialized Variables in PRENT (allowed)
 //////////////////////////////

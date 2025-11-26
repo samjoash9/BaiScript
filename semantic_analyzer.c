@@ -628,7 +628,7 @@ static SEM_TEMP evaluate_expression(ASTNode *node)
             }
 
             ret.is_constant = 1;
-            ret.int_value = after;
+            ret.int_value = before; 
         }
 
         return ret;
