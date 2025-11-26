@@ -219,28 +219,25 @@ KnownVar *sem_add_var(const char *name, SEM_TYPE type)
     k->next = known_vars_head;
     known_vars_head = k;
 
-    // --- Initialize INT / CHAR by default ---
     if (type == SEM_TYPE_INT || type == SEM_TYPE_CHAR) {
         k->initialized = 1;
         k->temp.is_constant = 1;
         k->temp.int_value = 0;
     } else {
-        k->initialized = 0;
+        k->initialized = 0; // KUAN starts uninitialized
     }
 
-    // Add to symbol table if not exists
     const char *dtype_str = "KUAN";
-    if (type == SEM_TYPE_INT)
-        dtype_str = "ENTEGER";
-    else if (type == SEM_TYPE_CHAR)
-        dtype_str = "CHAROT";
+    if (type == SEM_TYPE_INT) dtype_str = "ENTEGER";
+    else if (type == SEM_TYPE_CHAR) dtype_str = "CHAROT";
 
     int idx = find_symbol(name);
     if (idx == -1) add_symbol(name, dtype_str, k->initialized, 
-        k->initialized ? NULL : NULL); // optional: store value_str later
+        k->initialized ? NULL : NULL);
 
     return k;
 }
+
 
 SEM_TYPE sem_type_from_string(const char *s)
 {
@@ -880,7 +877,8 @@ void handle_declaration(ASTNode *decl_node, SEM_TYPE dtype)
         const char *name = decl_node->left->value;
         ASTNode *init_expr = decl_node->right;
 
-        KnownVar *kv = sem_add_var(name, dtype);
+        // Temporarily create as KUAN (unknown)
+        KnownVar *kv = sem_add_var(name, SEM_TYPE_UNKNOWN);
         if (!kv)
         {
             sem_record_error(decl_node, "Redeclaration of variable '%s'", name);
@@ -889,9 +887,40 @@ void handle_declaration(ASTNode *decl_node, SEM_TYPE dtype)
 
         // Evaluate initializer
         SEM_TEMP val = evaluate_expression(init_expr);
+
+        // --- Infer type from initializer ---
+        if (kv->temp.type == SEM_TYPE_UNKNOWN)
+        {
+            if (val.type == SEM_TYPE_INT)
+                kv->temp.type = SEM_TYPE_INT;
+            else if (val.type == SEM_TYPE_CHAR)
+                kv->temp.type = SEM_TYPE_CHAR;
+            else
+                kv->temp.type = SEM_TYPE_INT; // default fallback
+        }
+
         kv->temp.is_constant = val.is_constant;
         kv->temp.int_value = val.is_constant ? val.int_value : 0;
         kv->initialized = 1;
+
+        // Update symbol table
+        int idx = find_symbol(name);
+        if (idx != -1)
+        {
+            symbol_table[idx].initialized = 1;
+            if (kv->temp.type == SEM_TYPE_INT)
+                snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", kv->temp.int_value);
+            else if (kv->temp.type == SEM_TYPE_CHAR)
+                snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%c", (char)kv->temp.int_value);
+            
+            if (kv->temp.type == SEM_TYPE_INT)
+                strcpy(symbol_table[idx].datatype, "ENTEGER");
+            else
+                strcpy(symbol_table[idx].datatype, "CHAROT");
+
+                    
+        }
+
         return;
     }
 

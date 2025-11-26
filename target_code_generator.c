@@ -542,8 +542,6 @@ void output_assembly_file()
 
     if (fclose(file) != 0)
         perror("Error closing output file");
-    else
-        printf(">> Assembly code successfully written to output_assembly.txt\n");
 }
 
 // === TARGET CODE GENERATION ===
