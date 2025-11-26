@@ -733,6 +733,9 @@ static void buffer_print(const char *s)
 /* ----------------------------
    Handle print statements (buffered)
 ---------------------------- */
+/* ----------------------------
+   Handle print statements (printf-like)
+---------------------------- */
 static void handle_print(ASTNode *print_node)
 {
     if (!print_node)
@@ -744,28 +747,66 @@ static void handle_print(ASTNode *print_node)
     while (item)
     {
         ASTNode *expr = item->left ? item->left : item;
+
         char tempbuf[1024] = {0};
 
         if (expr->type == NODE_LITERAL)
         {
             const char *val = expr->value;
             size_t len = strlen(val);
+
             if (len >= 2 && val[0] == '"' && val[len - 1] == '"')
-                snprintf(tempbuf, sizeof(tempbuf), "%.*s", (int)(len - 2), val + 1);
+            {
+                // Handle string literal and escape sequences
+                size_t dst = 0;
+                for (size_t i = 1; i < len - 1; i++)
+                {
+                    if (val[i] == '\\' && i + 1 < len - 1)
+                    {
+                        i++;
+                        switch (val[i])
+                        {
+                        case 'n': tempbuf[dst++] = '\n'; break;
+                        case 't': tempbuf[dst++] = '\t'; break;
+                        case 'r': tempbuf[dst++] = '\r'; break;
+                        case '\\': tempbuf[dst++] = '\\'; break;
+                        case '\'': tempbuf[dst++] = '\''; break;
+                        case '"': tempbuf[dst++] = '"'; break;
+                        case '0': tempbuf[dst++] = '\0'; break;
+                        default: tempbuf[dst++] = val[i]; break;
+                        }
+                    }
+                    else
+                    {
+                        tempbuf[dst++] = val[i];
+                    }
+                }
+                tempbuf[dst] = '\0';
+            }
             else if (len >= 2 && val[0] == '\'' && val[len - 1] == '\'')
-                snprintf(tempbuf, sizeof(tempbuf), "%.*s", (int)(len - 2), val + 1);
+            {
+                // CHAROT literal
+                long ch;
+                if (try_parse_char_literal(val, &ch))
+                    snprintf(tempbuf, sizeof(tempbuf), "%c", (char)ch);
+                else
+                    snprintf(tempbuf, sizeof(tempbuf), "%s", val);
+            }
             else
+            {
                 snprintf(tempbuf, sizeof(tempbuf), "%s", val);
+            }
         }
         else
         {
+            // Evaluate expression
             SEM_TEMP val = evaluate_expression(expr);
 
             if (expr->type == NODE_IDENTIFIER)
             {
                 KnownVar *kv = sem_find_var(expr->value);
                 if (kv)
-                    kv->used = 1; // mark as used
+                    kv->used = 1;
 
                 if (kv && kv->temp.is_constant)
                 {
@@ -791,13 +832,17 @@ static void handle_print(ASTNode *print_node)
             }
         }
 
+        // Append to print buffer
         buffer_print(tempbuf);
+
+        // Move to next item in list (comma-separated)
         item = item->right;
     }
 
-    buffer_print("\n");
+    buffer_print("\n"); // Append newline at end of PRENT
     sem_inside_print = 0; // End print context
 }
+
 
 /* ----------------------------
    Declaration & assignment
@@ -952,7 +997,7 @@ static void analyze_node(ASTNode *node)
             SEM_TYPE dtype = SEM_TYPE_INT; // default
             if (node->value) {
                 if (strcmp(node->value, "ENTEGER") == 0) dtype = SEM_TYPE_INT;
-                else if (strcmp(node->value, "CHAR") == 0) dtype = SEM_TYPE_CHAR;
+                else if (strcmp(node->value, "CHAROT") == 0) dtype = SEM_TYPE_CHAR;
             }
 
             // Pass dtype to recursive handler
