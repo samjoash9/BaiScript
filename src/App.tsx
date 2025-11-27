@@ -17,7 +17,6 @@ export default function App() {
     return savedTheme || 'dark';
   });
 
-  // Persist theme
   useEffect(() => {
     const root = document.documentElement;
     if (theme === 'dark') root.classList.add('dark');
@@ -25,7 +24,6 @@ export default function App() {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
-  // Persist editor/output states
   useEffect(() => {
     localStorage.setItem('sourceCode', sourceCode);
   }, [sourceCode]);
@@ -73,11 +71,15 @@ export default function App() {
     }
   };
 
-  const handleClear = () => {
+  const handleClearOutput = () => {
     setOutput('');
     setTargetCode('');
     setMachineCode('');
   };
+
+  const handleClearInput = () => {
+    setSourceCode('');
+  }
 
   const handleImport = () => {
     const input = document.createElement('input');
@@ -143,7 +145,13 @@ export default function App() {
 
           {/* Header Buttons */}
           <div className="flex items-center gap-3" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-            <button type="button" onClick={handleClear} className={`px-4 py-2 rounded-lg border transition-all ${theme === 'dark'
+            <button type="button" onClick={handleClearInput} className={`px-4 py-2 rounded-lg border transition-all ${theme === 'dark'
+              ? 'border-gray-700 hover:border-gray-600 hover:bg-gray-800/50'
+              : 'border-gray-300/70 hover:border-gray-400 hover:bg-gray-100'}`}>
+              Clear Input
+            </button>
+
+            <button type="button" onClick={handleClearOutput} className={`px-4 py-2 rounded-lg border transition-all ${theme === 'dark'
               ? 'border-gray-700 hover:border-gray-600 hover:bg-gray-800/50'
               : 'border-gray-300/70 hover:border-gray-400 hover:bg-gray-100'}`}>
               Clear Output
@@ -171,7 +179,7 @@ export default function App() {
 
       <Toolbar
         onImport={handleImport}
-        onExport={handleExport}  // ← pass your export function
+        onExport={handleExport}
         theme={theme}
       />
 
