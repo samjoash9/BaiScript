@@ -88,13 +88,12 @@ export function CodeEditor({
             <div className={`px-4 py-2 font-semibold text-sm border-b border-gray-600/30 ${isDark ? 'bg-gray-800/50 text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
               ASSEMBLY CODE
             </div>
-            <textarea
-              value={machineValue.assembly || 'No assembly generated'}
-              readOnly
-              spellCheck={false}
-              className={`flex-1 w-full pl-4 pr-4 text-sm font-mono resize-none focus:outline-none transition-colors ${getEditorBg()} ${getTextColor()} ${getPlaceholderColor()} border-none`}
-              style={{ lineHeight: '1.6', tabSize: 2 }}
-            />
+            <div
+              className={`flex-1 overflow-auto pl-4 pr-4 text-sm font-mono ${getEditorBg()} ${getTextColor()} ${getPlaceholderColor()} border-none`}
+              style={{ lineHeight: '1.6', tabSize: 2, whiteSpace: 'pre' }}
+            >
+              {machineValue.assembly || 'No assembly generated'}
+            </div>
           </div>
 
           {/* Binary Section - Extra wide for long binary strings */}
@@ -102,13 +101,12 @@ export function CodeEditor({
             <div className={`px-4 py-2 font-semibold text-sm border-b border-gray-600/30 ${isDark ? 'bg-gray-800/50 text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
               BINARY CODE
             </div>
-            <textarea
-              value={machineValue.binary || 'No binary generated'}
-              readOnly
-              spellCheck={false}
-              className={`flex-1 w-full pl-4 pr-4 text-sm font-mono resize-none focus:outline-none transition-colors ${getEditorBg()} ${getTextColor()} ${getPlaceholderColor()} border-none`}
-              style={{ lineHeight: '1.6', tabSize: 2 }}
-            />
+            <div
+              className={`flex-1 overflow-auto pl-4 pr-4 text-sm font-mono ${getEditorBg()} ${getTextColor()} ${getPlaceholderColor()} border-none`}
+              style={{ lineHeight: '1.6', tabSize: 2, whiteSpace: 'pre' }}
+            >
+              {machineValue.binary || 'No binary generated'}
+            </div>
           </div>
 
           {/* Hex Section - Narrower since hex is more compact */}
@@ -116,13 +114,12 @@ export function CodeEditor({
             <div className={`px-4 py-2 font-semibold text-sm border-b border-gray-600/30 ${isDark ? 'bg-gray-800/50 text-gray-300' : 'bg-gray-100 text-gray-700'}`}>
               HEX CODE
             </div>
-            <textarea
-              value={machineValue.hex || 'No hex generated'}
-              readOnly
-              spellCheck={false}
-              className={`flex-1 w-full pl-4 pr-4 text-sm font-mono resize-none focus:outline-none transition-colors ${getEditorBg()} ${getTextColor()} ${getPlaceholderColor()} border-none`}
-              style={{ lineHeight: '1.6', tabSize: 2 }}
-            />
+            <div
+              className={`flex-1 overflow-auto pl-4 pr-4 text-sm font-mono ${getEditorBg()} ${getTextColor()} ${getPlaceholderColor()} border-none`}
+              style={{ lineHeight: '1.6', tabSize: 2, whiteSpace: 'pre' }}
+            >
+              {machineValue.hex || 'No hex generated'}
+            </div>
           </div>
         </div>
       );
