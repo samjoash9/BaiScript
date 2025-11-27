@@ -208,12 +208,16 @@ KnownVar *sem_find_var(const char *name)
 
 KnownVar *sem_add_var(const char *name, SEM_TYPE type)
 {
+    /* If already present, return existing KnownVar (do not treat as error here). */
     KnownVar *existing = sem_find_var(name);
     if (existing)
         return existing;
 
     KnownVar *k = (KnownVar *)malloc(sizeof(KnownVar));
+    if (!k)
+        return NULL;
     k->name = strdup(name);
+    if (!k->name) { free(k); return NULL; }
     k->temp = sem_new_temp(type);
     k->used = 0;
     k->next = known_vars_head;
@@ -232,8 +236,8 @@ KnownVar *sem_add_var(const char *name, SEM_TYPE type)
     else if (type == SEM_TYPE_CHAR) dtype_str = "CHAROT";
 
     int idx = find_symbol(name);
-    if (idx == -1) add_symbol(name, dtype_str, k->initialized, 
-        k->initialized ? NULL : NULL);
+    if (idx == -1)
+        add_symbol(name, dtype_str, k->initialized, k->initialized ? NULL : NULL);
 
     return k;
 }
@@ -798,35 +802,77 @@ void handle_declaration(ASTNode *decl_node, SEM_TYPE dtype)
     if (!decl_node)
         return;
 
-    // If this node is an identifier
+    /* Simple identifier declaration */
     if (decl_node->type == NODE_IDENTIFIER)
     {
         const char *name = decl_node->value;
-        KnownVar *kv = sem_add_var(name, dtype);
-        if (!kv)
+        KnownVar *existing = sem_find_var(name);
+
+        /* Any existing declaration = ERROR */
+        if (existing)
         {
-            sem_record_error(decl_node, "Redeclaration of variable '%s'", name);
+            sem_record_error(decl_node,
+                "Duplicate declaration of variable '%s'", name);
             return;
         }
 
-        // Default initialize INT/CHAR
+        /* Create new variable */
+        KnownVar *kv = sem_add_var(name, dtype);
+        if (!kv)
+        {
+            sem_record_error(decl_node,
+                "Failed to declare variable '%s'", name);
+            return;
+        }
+
+        /* Default initialization for typed variables */
         if (dtype == SEM_TYPE_INT || dtype == SEM_TYPE_CHAR)
         {
             kv->temp.is_constant = 1;
             kv->temp.int_value = 0;
+            kv->initialized = 1;
         }
 
-        kv->initialized = 1;
         return;
     }
 
-    // If this node is an initialized declaration
+    /* Initialized declaration: IDENT = EXPR */
     if (decl_node->type == NODE_DECLARATION && strcmp(decl_node->value, "INIT_DECL") == 0)
     {
         const char *name = decl_node->left->value;
         ASTNode *init_expr = decl_node->right;
 
-        // Temporarily create as KUAN (unknown)
+        KnownVar *existing = sem_find_var(name);
+        if (existing) {
+            /* If existing has concrete type different from what initializer implies, error */
+            SEM_TEMP val = evaluate_expression(init_expr);
+            SEM_TYPE inferred = (val.type != SEM_TYPE_UNKNOWN) ? val.type : SEM_TYPE_INT;
+            if (existing->temp.type != SEM_TYPE_UNKNOWN && inferred != SEM_TYPE_UNKNOWN
+                && existing->temp.type != inferred) {
+                sem_record_error(decl_node, "Redeclaration/initializer type mismatch for '%s'", name);
+                return;
+            }
+            /* otherwise allow initialization to set value/type if unknown */
+            if (existing->temp.type == SEM_TYPE_UNKNOWN)
+                existing->temp.type = inferred;
+            existing->temp.is_constant = val.is_constant;
+            existing->temp.int_value = val.is_constant ? val.int_value : 0;
+            existing->initialized = 1;
+
+            int idx = find_symbol(name);
+            if (idx != -1) {
+                symbol_table[idx].initialized = 1;
+                if (existing->temp.type == SEM_TYPE_INT)
+                    snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", existing->temp.int_value);
+                else
+                    snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%c", (char)existing->temp.int_value);
+                if (existing->temp.type == SEM_TYPE_INT) strcpy(symbol_table[idx].datatype, "ENTEGER");
+                else if (existing->temp.type == SEM_TYPE_CHAR) strcpy(symbol_table[idx].datatype, "CHAROT");
+            }
+            return;
+        }
+
+        /* create new as before */
         KnownVar *kv = sem_add_var(name, SEM_TYPE_UNKNOWN);
         if (!kv)
         {
@@ -834,25 +880,17 @@ void handle_declaration(ASTNode *decl_node, SEM_TYPE dtype)
             return;
         }
 
-        // Evaluate initializer
         SEM_TEMP val = evaluate_expression(init_expr);
-
-        // --- Infer type from initializer ---
         if (kv->temp.type == SEM_TYPE_UNKNOWN)
         {
-            if (val.type == SEM_TYPE_INT)
-                kv->temp.type = SEM_TYPE_INT;
-            else if (val.type == SEM_TYPE_CHAR)
-                kv->temp.type = SEM_TYPE_CHAR;
-            else
-                kv->temp.type = SEM_TYPE_INT; // default fallback
+            if (val.type == SEM_TYPE_INT) kv->temp.type = SEM_TYPE_INT;
+            else if (val.type == SEM_TYPE_CHAR) kv->temp.type = SEM_TYPE_CHAR;
+            else kv->temp.type = SEM_TYPE_INT;
         }
-
         kv->temp.is_constant = val.is_constant;
         kv->temp.int_value = val.is_constant ? val.int_value : 0;
         kv->initialized = 1;
 
-        // Update symbol table
         int idx = find_symbol(name);
         if (idx != -1)
         {
@@ -861,22 +899,19 @@ void handle_declaration(ASTNode *decl_node, SEM_TYPE dtype)
                 snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", kv->temp.int_value);
             else if (kv->temp.type == SEM_TYPE_CHAR)
                 snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%c", (char)kv->temp.int_value);
-            
             if (kv->temp.type == SEM_TYPE_INT)
                 strcpy(symbol_table[idx].datatype, "ENTEGER");
             else
                 strcpy(symbol_table[idx].datatype, "CHAROT");
-
-                    
         }
-
         return;
     }
 
-    // Otherwise, recursively handle left and right subtrees
+    /* Otherwise recurse */
     handle_declaration(decl_node->left, dtype);
     handle_declaration(decl_node->right, dtype);
 }
+
 
 
 

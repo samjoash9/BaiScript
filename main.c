@@ -104,7 +104,7 @@ int main()
         write_assembly_error_file(parse_error_msg);
         write_machine_error_files("No machine code generated due to parse errors.");
         write_tac_error_file("No TAC generated due to parse errors.");
-        write_print_error_file("Compilation failed due to parse errors.");
+        write_print_error_file("[MAIN] Compilation failed due to parse errors.");
     }
 
     printf("\n=== BaiScript IS PARSED! ===\n");
@@ -131,7 +131,6 @@ int main()
             write_assembly_error_file(sem_error_msg);
             write_machine_error_files("No machine code generated due to semantic errors.");
             write_tac_error_file("No TAC generated due to semantic errors.");
-            write_print_error_file("Compilation failed due to semantic errors.");
         }
     }
     else
