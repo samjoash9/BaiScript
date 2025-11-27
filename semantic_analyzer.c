@@ -219,30 +219,25 @@ KnownVar *sem_add_var(const char *name, SEM_TYPE type)
     k->next = known_vars_head;
     known_vars_head = k;
 
-    if (type == SEM_TYPE_INT || type == SEM_TYPE_CHAR)
-    {
+    if (type == SEM_TYPE_INT || type == SEM_TYPE_CHAR) {
         k->initialized = 1;
         k->temp.is_constant = 1;
         k->temp.int_value = 0;
-    }
-    else
-    {
+    } else {
         k->initialized = 0; // KUAN starts uninitialized
     }
 
     const char *dtype_str = "KUAN";
-    if (type == SEM_TYPE_INT)
-        dtype_str = "ENTEGER";
-    else if (type == SEM_TYPE_CHAR)
-        dtype_str = "CHAROT";
+    if (type == SEM_TYPE_INT) dtype_str = "ENTEGER";
+    else if (type == SEM_TYPE_CHAR) dtype_str = "CHAROT";
 
     int idx = find_symbol(name);
-    if (idx == -1)
-        add_symbol(name, dtype_str, k->initialized,
-                   k->initialized ? NULL : NULL);
+    if (idx == -1) add_symbol(name, dtype_str, k->initialized, 
+        k->initialized ? NULL : NULL);
 
     return k;
 }
+
 
 SEM_TYPE sem_type_from_string(const char *s)
 {
@@ -493,8 +488,17 @@ static SEM_TEMP eval_additive(ASTNode *node)
             val = L.int_value - R.int_value;
         else
             goto no_fold_add;
-        // Determine result type: preserve CHAR if any operand is CHAR
-        SEM_TYPE result_type = (L.type == SEM_TYPE_CHAR || R.type == SEM_TYPE_CHAR) ? SEM_TYPE_CHAR : SEM_TYPE_INT;
+       
+            SEM_TYPE result_type;
+        if (L.type == SEM_TYPE_CHAR && R.type == SEM_TYPE_INT)
+            result_type = SEM_TYPE_CHAR;
+        else if (L.type == SEM_TYPE_INT && R.type == SEM_TYPE_CHAR)
+            result_type = SEM_TYPE_INT;
+        else if (L.type == SEM_TYPE_CHAR && R.type == SEM_TYPE_CHAR)
+            result_type = SEM_TYPE_CHAR;
+        else
+            result_type = SEM_TYPE_INT; // default for INT+INT
+
 
         SEM_TEMP t = sem_new_temp(result_type);
         t.is_constant = 1;
@@ -630,7 +634,7 @@ static SEM_TEMP evaluate_expression(ASTNode *node)
             }
 
             ret.is_constant = 1;
-            ret.int_value = before;
+            ret.int_value = before; 
         }
 
         return ret;
@@ -641,8 +645,7 @@ static SEM_TEMP evaluate_expression(ASTNode *node)
         ASTNode *lhs = node->left;
         ASTNode *rhs = node->right;
 
-        if (!lhs || lhs->type != NODE_IDENTIFIER)
-        {
+        if (!lhs || lhs->type != NODE_IDENTIFIER) {
             sem_record_error(node, "Left side of assignment is not an identifier");
             return sem_new_temp(SEM_TYPE_UNKNOWN);
         }
@@ -656,7 +659,7 @@ static SEM_TEMP evaluate_expression(ASTNode *node)
         SEM_TEMP rval = evaluate_expression(rhs);
 
         long oldval = 0;
-        if (strcmp(op, "=") != 0) // compound assignment requires reading old value
+        if (strcmp(op, "=") != 0)   // compound assignment requires reading old value
         {
             if (!kv->initialized)
                 sem_record_error(node, "Use of uninitialized variable '%s' in compound assignment", name);
@@ -667,25 +670,19 @@ static SEM_TEMP evaluate_expression(ASTNode *node)
         long newval = rval.int_value;
 
         // Handle compound operators
-        if (strcmp(op, "+=") == 0)
-            newval = oldval + rval.int_value;
-        else if (strcmp(op, "-=") == 0)
-            newval = oldval - rval.int_value;
-        else if (strcmp(op, "*=") == 0)
-            newval = oldval * rval.int_value;
-        else if (strcmp(op, "/=") == 0)
-        {
+        if      (strcmp(op, "+=") == 0) newval = oldval + rval.int_value;
+        else if (strcmp(op, "-=") == 0) newval = oldval - rval.int_value;
+        else if (strcmp(op, "*=") == 0) newval = oldval * rval.int_value;
+        else if (strcmp(op, "/=") == 0) {
             if (rval.int_value == 0)
                 sem_record_error(node, "Division by zero");
             else
                 newval = oldval / rval.int_value;
         }
-        else if (strcmp(op, "=") == 0)
-        {
+        else if (strcmp(op, "=") == 0) {
             // simple assignment, already handled
         }
-        else
-        {
+        else {
             sem_record_error(node, "Unknown assignment operator '%s'", op);
         }
 
@@ -695,8 +692,7 @@ static SEM_TEMP evaluate_expression(ASTNode *node)
         kv->temp.int_value = newval;
 
         int idx = find_symbol(name);
-        if (idx != -1)
-        {
+        if (idx != -1) {
             symbol_table[idx].initialized = 1;
             snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", newval);
         }
@@ -776,30 +772,14 @@ static void handle_print(ASTNode *print_node)
                         i++;
                         switch (val[i])
                         {
-                        case 'n':
-                            tempbuf[dst++] = '\n';
-                            break;
-                        case 't':
-                            tempbuf[dst++] = '\t';
-                            break;
-                        case 'r':
-                            tempbuf[dst++] = '\r';
-                            break;
-                        case '\\':
-                            tempbuf[dst++] = '\\';
-                            break;
-                        case '\'':
-                            tempbuf[dst++] = '\'';
-                            break;
-                        case '"':
-                            tempbuf[dst++] = '"';
-                            break;
-                        case '0':
-                            tempbuf[dst++] = '\0';
-                            break;
-                        default:
-                            tempbuf[dst++] = val[i];
-                            break;
+                        case 'n': tempbuf[dst++] = '\n'; break;
+                        case 't': tempbuf[dst++] = '\t'; break;
+                        case 'r': tempbuf[dst++] = '\r'; break;
+                        case '\\': tempbuf[dst++] = '\\'; break;
+                        case '\'': tempbuf[dst++] = '\''; break;
+                        case '"': tempbuf[dst++] = '"'; break;
+                        case '0': tempbuf[dst++] = '\0'; break;
+                        default: tempbuf[dst++] = val[i]; break;
                         }
                     }
                     else
@@ -865,9 +845,10 @@ static void handle_print(ASTNode *print_node)
         item = item->right;
     }
 
-    buffer_print("\n");   // Append newline at end of PRENT
+    buffer_print("\n"); // Append newline at end of PRENT
     sem_inside_print = 0; // End print context
 }
+
 
 /* ----------------------------
    Declaration & assignment
@@ -940,11 +921,13 @@ void handle_declaration(ASTNode *decl_node, SEM_TYPE dtype)
                 snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", kv->temp.int_value);
             else if (kv->temp.type == SEM_TYPE_CHAR)
                 snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%c", (char)kv->temp.int_value);
-
+            
             if (kv->temp.type == SEM_TYPE_INT)
                 strcpy(symbol_table[idx].datatype, "ENTEGER");
             else
                 strcpy(symbol_table[idx].datatype, "CHAROT");
+
+                    
         }
 
         return;
@@ -954,6 +937,9 @@ void handle_declaration(ASTNode *decl_node, SEM_TYPE dtype)
     handle_declaration(decl_node->left, dtype);
     handle_declaration(decl_node->right, dtype);
 }
+
+
+
 
 static void handle_assignment(ASTNode *assign_node)
 {
@@ -1034,48 +1020,43 @@ static void analyze_node(ASTNode *node)
         return;
     switch (node->type)
     {
-    case NODE_START:
-        analyze_node(node->left);
-        break;
-    case NODE_STATEMENT_LIST:
-        analyze_node(node->left);
-        analyze_node(node->right);
-        break;
-    case NODE_STATEMENT:
-        analyze_node(node->left);
-        apply_deferred_ops(); // harmless (not used in current immediate semantics)
-        break;
-    case NODE_DECLARATION:
-    {
-        // Determine the type (ENTEGER / CHAR / etc)
-        SEM_TYPE dtype = SEM_TYPE_INT; // default
-        if (node->value)
+        case NODE_START: analyze_node(node->left); break;
+        case NODE_STATEMENT_LIST:
+            analyze_node(node->left);
+            analyze_node(node->right);
+            break;
+        case NODE_STATEMENT:
+            analyze_node(node->left);
+            apply_deferred_ops(); // harmless (not used in current immediate semantics)
+            break;
+        case NODE_DECLARATION:
         {
-            if (strcmp(node->value, "ENTEGER") == 0)
-                dtype = SEM_TYPE_INT;
-            else if (strcmp(node->value, "CHAROT") == 0)
-                dtype = SEM_TYPE_CHAR;
+            // Determine the type (ENTEGER / CHAR / etc)
+            SEM_TYPE dtype = SEM_TYPE_INT; // default
+            if (node->value) {
+                if (strcmp(node->value, "ENTEGER") == 0) dtype = SEM_TYPE_INT;
+                else if (strcmp(node->value, "CHAROT") == 0) dtype = SEM_TYPE_CHAR;
+            }
+
+            // Pass dtype to recursive handler
+            handle_declaration(node->left, dtype);
+
+            apply_deferred_ops();
+            break;
         }
-
-        // Pass dtype to recursive handler
-        handle_declaration(node->left, dtype);
-
-        apply_deferred_ops();
-        break;
-    }
-    break;
-    case NODE_ASSIGNMENT:
-        handle_assignment(node);
-        apply_deferred_ops();
-        break;
-    case NODE_PRINTING:
-    case NODE_PRINT_ITEM:
-        handle_print(node);
-        apply_deferred_ops();
-        break;
-    default:
-        evaluate_expression(node);
-        break;
+            break;
+        case NODE_ASSIGNMENT:
+            handle_assignment(node);
+            apply_deferred_ops();
+            break;
+        case NODE_PRINTING:
+        case NODE_PRINT_ITEM:
+            handle_print(node);
+            apply_deferred_ops();
+            break;
+        default:
+            evaluate_expression(node);
+            break;
     }
 }
 
