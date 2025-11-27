@@ -479,41 +479,39 @@ static SEM_TEMP eval_additive(ASTNode *node)
     SEM_TEMP R = eval_term(node->right);
     const char *op = node->value ? node->value : "";
 
-    if (L.is_constant && R.is_constant && op[0] != '\0')
+    long val = 0;
+    SEM_TYPE result_type = SEM_TYPE_INT;
+
+    // Determine result type based on operand types
+    if (L.type == SEM_TYPE_CHAR && R.type == SEM_TYPE_CHAR)
+        result_type = SEM_TYPE_CHAR;       // CHAR + CHAR
+    else if (L.type == SEM_TYPE_CHAR && R.type == SEM_TYPE_INT)
+        result_type = SEM_TYPE_CHAR;       // CHAR + INT → CHAR
+    else if (L.type == SEM_TYPE_INT && R.type == SEM_TYPE_CHAR)
+        result_type = SEM_TYPE_INT;        // INT + CHAR → INT
+    else
+        result_type = SEM_TYPE_INT;        // INT + INT or unknown
+
+    // Constant folding if possible
+    if (L.is_constant && R.is_constant)
     {
-        long val = 0;
         if (strcmp(op, "+") == 0)
             val = L.int_value + R.int_value;
         else if (strcmp(op, "-") == 0)
             val = L.int_value - R.int_value;
         else
-            goto no_fold_add;
-       
-            SEM_TYPE result_type;
-        if (L.type == SEM_TYPE_CHAR && R.type == SEM_TYPE_INT)
-            result_type = SEM_TYPE_CHAR;
-        else if (L.type == SEM_TYPE_INT && R.type == SEM_TYPE_CHAR)
-            result_type = SEM_TYPE_INT;
-        else if (L.type == SEM_TYPE_CHAR && R.type == SEM_TYPE_CHAR)
-            result_type = SEM_TYPE_CHAR;
-        else
-            result_type = SEM_TYPE_INT; // default for INT+INT
-
-
-        SEM_TEMP t = sem_new_temp(result_type);
-        t.is_constant = 1;
-        t.int_value = val;
-        t.node = node;
-        return t;
+            val = 0; // fallback
     }
 
-no_fold_add:
-{
-    SEM_TEMP res = sem_new_temp(SEM_TYPE_INT);
-    res.node = node;
-    return res;
+    SEM_TEMP t = sem_new_temp(result_type);
+    t.is_constant = (L.is_constant && R.is_constant);
+    t.int_value = val;
+    t.node = node;
+    t.type = result_type;
+
+    return t;
 }
-}
+
 
 static SEM_TEMP evaluate_expression(ASTNode *node)
 {
@@ -736,9 +734,7 @@ static void buffer_print(const char *s)
     }
 }
 
-/* ----------------------------
-   Handle print statements (buffered)
----------------------------- */
+
 /* ----------------------------
    Handle print statements (printf-like)
 ---------------------------- */
@@ -756,89 +752,33 @@ static void handle_print(ASTNode *print_node)
 
         char tempbuf[1024] = {0};
 
-        if (expr->type == NODE_LITERAL)
-        {
-            const char *val = expr->value;
-            size_t len = strlen(val);
+        // Evaluate expression
+        SEM_TEMP val = evaluate_expression(expr);
 
-            if (len >= 2 && val[0] == '"' && val[len - 1] == '"')
-            {
-                // Handle string literal and escape sequences
-                size_t dst = 0;
-                for (size_t i = 1; i < len - 1; i++)
-                {
-                    if (val[i] == '\\' && i + 1 < len - 1)
-                    {
-                        i++;
-                        switch (val[i])
-                        {
-                        case 'n': tempbuf[dst++] = '\n'; break;
-                        case 't': tempbuf[dst++] = '\t'; break;
-                        case 'r': tempbuf[dst++] = '\r'; break;
-                        case '\\': tempbuf[dst++] = '\\'; break;
-                        case '\'': tempbuf[dst++] = '\''; break;
-                        case '"': tempbuf[dst++] = '"'; break;
-                        case '0': tempbuf[dst++] = '\0'; break;
-                        default: tempbuf[dst++] = val[i]; break;
-                        }
-                    }
-                    else
-                    {
-                        tempbuf[dst++] = val[i];
-                    }
-                }
-                tempbuf[dst] = '\0';
-            }
-            else if (len >= 2 && val[0] == '\'' && val[len - 1] == '\'')
-            {
-                // CHAROT literal
-                long ch;
-                if (try_parse_char_literal(val, &ch))
-                    snprintf(tempbuf, sizeof(tempbuf), "%c", (char)ch);
-                else
-                    snprintf(tempbuf, sizeof(tempbuf), "%s", val);
-            }
-            else
-            {
-                snprintf(tempbuf, sizeof(tempbuf), "%s", val);
-            }
+        // If identifier, update usage
+        if (expr->type == NODE_IDENTIFIER)
+        {
+            KnownVar *kv = sem_find_var(expr->value);
+            if (kv)
+                kv->used = 1;
+        }
+
+        // Decide how to print based on actual variable type
+        if (val.type == SEM_TYPE_CHAR)
+        {
+            tempbuf[0] = (char)val.int_value;
+            tempbuf[1] = '\0';
+        }
+        else if (val.type == SEM_TYPE_INT)
+        {
+            snprintf(tempbuf, sizeof(tempbuf), "%ld", val.int_value);
         }
         else
         {
-            // Evaluate expression
-            SEM_TEMP val = evaluate_expression(expr);
-
-            if (expr->type == NODE_IDENTIFIER)
-            {
-                KnownVar *kv = sem_find_var(expr->value);
-                if (kv)
-                    kv->used = 1;
-
-                if (kv && kv->temp.is_constant)
-                {
-                    if (kv->temp.type == SEM_TYPE_CHAR)
-                        snprintf(tempbuf, sizeof(tempbuf), "%c", (char)kv->temp.int_value);
-                    else
-                        snprintf(tempbuf, sizeof(tempbuf), "%ld", kv->temp.int_value);
-                }
-                else
-                {
-                    if (val.type == SEM_TYPE_CHAR)
-                        snprintf(tempbuf, sizeof(tempbuf), "%c", (char)val.int_value);
-                    else
-                        snprintf(tempbuf, sizeof(tempbuf), "%ld", val.is_constant ? val.int_value : 0);
-                }
-            }
-            else
-            {
-                if (val.type == SEM_TYPE_CHAR)
-                    snprintf(tempbuf, sizeof(tempbuf), "%c", (char)val.int_value);
-                else
-                    snprintf(tempbuf, sizeof(tempbuf), "%ld", val.is_constant ? val.int_value : 0);
-            }
+            // Fallback for KUAN / unknown: print integer
+            snprintf(tempbuf, sizeof(tempbuf), "%ld", val.int_value);
         }
 
-        // Append to print buffer
         buffer_print(tempbuf);
 
         // Move to next item in list (comma-separated)
@@ -940,75 +880,90 @@ void handle_declaration(ASTNode *decl_node, SEM_TYPE dtype)
 
 
 
-
 static void handle_assignment(ASTNode *assign_node)
 {
+    if (!assign_node || !assign_node->left)
+        return;
+
     ASTNode *lhs = assign_node->left;
     ASTNode *rhs = assign_node->right;
-    if (!lhs || lhs->type != NODE_IDENTIFIER)
+
+    if (lhs->type != NODE_IDENTIFIER)
     {
-        sem_record_error(assign_node, "Invalid LHS");
+        sem_record_error(assign_node, "Left-hand side of assignment must be an identifier");
         return;
     }
 
     const char *name = lhs->value;
     KnownVar *kv = sem_find_var(name);
     if (!kv)
-        kv = sem_add_var(name, SEM_TYPE_INT);
+    {
+        // Default to KUAN if not declared
+        kv = sem_add_var(name, SEM_TYPE_UNKNOWN);
+    }
 
+    // Evaluate RHS
     SEM_TEMP rhs_temp = evaluate_expression(rhs);
 
-    int is_compound = assign_node->value && strlen(assign_node->value) == 2; // e.g. "+="
-    if (is_compound && !kv->initialized)
-        sem_record_error(lhs, "Compound assignment to uninitialized variable '%s'", name);
-
-    if (is_compound && kv->initialized && rhs_temp.is_constant)
+    // --- Propagate type for KUAN ---
+    if (kv->temp.type == SEM_TYPE_UNKNOWN)
     {
-        const char *op = assign_node->value; // "+=", "-=", "*=", "/="
+        kv->temp.type = rhs_temp.type != SEM_TYPE_UNKNOWN ? rhs_temp.type : SEM_TYPE_INT;
+    }
+
+    // Determine final type for compound operations (optional)
+    SEM_TYPE final_type = kv->temp.type;
+
+    // Compute new value
+    long newval = rhs_temp.is_constant ? rhs_temp.int_value : 0;
+
+    // Handle compound assignment
+    if (assign_node->value && strlen(assign_node->value) == 2) // e.g., "+="
+    {
+        const char *op = assign_node->value;
         long lhs_val = kv->temp.is_constant ? kv->temp.int_value : 0;
-        long newval = lhs_val;
-        if (strcmp(op, "+=") == 0)
-            newval = lhs_val + rhs_temp.int_value;
-        else if (strcmp(op, "-=") == 0)
-            newval = lhs_val - rhs_temp.int_value;
-        else if (strcmp(op, "*=") == 0)
-            newval = lhs_val * rhs_temp.int_value;
+
+        if (strcmp(op, "+=") == 0) newval = lhs_val + newval;
+        else if (strcmp(op, "-=") == 0) newval = lhs_val - newval;
+        else if (strcmp(op, "*=") == 0) newval = lhs_val * newval;
         else if (strcmp(op, "/=") == 0)
         {
-            if (rhs_temp.int_value == 0)
+            if (newval == 0)
             {
-                sem_record_error(assign_node, "Division by zero in compound assignment");
+                sem_record_error(assign_node, "Division by zero in assignment");
                 newval = 0;
             }
-            else
-                newval = lhs_val / rhs_temp.int_value;
+            else newval = lhs_val / newval;
         }
-        kv->initialized = 1;
-        kv->temp.is_constant = 1;
-        kv->temp.int_value = newval;
-        int idx = find_symbol(name);
-        if (idx != -1)
-        {
-            symbol_table[idx].initialized = 1;
-            snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", newval);
-        }
-    }
-    else
-    {
-        // simple assignment or compound with non-constant RHS
-        kv->initialized = 1;
-        kv->temp.is_constant = rhs_temp.is_constant;
-        kv->temp.int_value = rhs_temp.is_constant ? rhs_temp.int_value : 0;
 
-        int idx = find_symbol(name);
-        if (idx != -1)
-        {
-            symbol_table[idx].initialized = 1;
-            if (kv->temp.is_constant)
-                snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", kv->temp.int_value);
-        }
+        // Promote CHAR operands if necessary
+        if (kv->temp.type == SEM_TYPE_CHAR || rhs_temp.type == SEM_TYPE_CHAR)
+            final_type = SEM_TYPE_CHAR;
+        else
+            final_type = SEM_TYPE_INT;
+    }
+
+    // Store final value
+    kv->temp.int_value = newval;
+    kv->temp.is_constant = 1;
+    kv->temp.type = final_type;
+    kv->initialized = 1;
+
+    // Update symbol table
+    int idx = find_symbol(name);
+    if (idx != -1)
+    {
+        symbol_table[idx].initialized = 1;
+        if (final_type == SEM_TYPE_INT)
+            snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", newval);
+        else if (final_type == SEM_TYPE_CHAR)
+            snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%c", (char)newval);
+
+        if (final_type == SEM_TYPE_INT) strcpy(symbol_table[idx].datatype, "ENTEGER");
+        else if (final_type == SEM_TYPE_CHAR) strcpy(symbol_table[idx].datatype, "CHAROT");
     }
 }
+
 
 /* ----------------------------
    AST traversal
@@ -1031,16 +986,13 @@ static void analyze_node(ASTNode *node)
             break;
         case NODE_DECLARATION:
         {
-            // Determine the type (ENTEGER / CHAR / etc)
-            SEM_TYPE dtype = SEM_TYPE_INT; // default
+            SEM_TYPE dtype = SEM_TYPE_UNKNOWN; // default to unknown, not INT
             if (node->value) {
                 if (strcmp(node->value, "ENTEGER") == 0) dtype = SEM_TYPE_INT;
                 else if (strcmp(node->value, "CHAROT") == 0) dtype = SEM_TYPE_CHAR;
+                else if (strcmp(node->value, "KUAN") == 0) dtype = SEM_TYPE_UNKNOWN;
             }
-
-            // Pass dtype to recursive handler
             handle_declaration(node->left, dtype);
-
             apply_deferred_ops();
             break;
         }
