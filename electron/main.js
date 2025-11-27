@@ -7,9 +7,9 @@ let mainWindow;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1400,
+    width: 1600,
     height: 900,
-    minWidth: 900,
+    minWidth: 1170,
     minHeight: 600,
     frame: false,
     titleBarStyle: 'hidden',
@@ -62,27 +62,48 @@ ipcMain.handle('run-compiler', async (event, sourceCode) => {
     try {
       const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
-      // Paths
+      // Compiler executable path
       const exePath = isDev
-        ? path.join(__dirname, '../main.exe')           // Dev mode
-        : path.join(process.resourcesPath, 'main.exe'); // Production
+        ? path.join(__dirname, '../main.exe')
+        : path.join(process.resourcesPath, 'main.exe');
 
       // Folder to store input/output files
-      const tempDir = isDev
-        ? path.join(__dirname, '..')    // Project root in dev
-        : app.getPath('userData');      // UserData folder in production
+      const tempDir = isDev ? path.join(__dirname, '..') : app.getPath('userData');
 
+      // File paths
       const inputPath = path.join(tempDir, 'input.txt');
       const outputPrintPath = path.join(tempDir, 'output_print.txt');
       const outputAssemblyPath = path.join(tempDir, 'output_assembly.txt');
-      const outputMachinePath = path.join(tempDir, 'output_machine.txt');
+      const outputMachineAssemblyPath = path.join(tempDir, 'output_machine_assembly.txt');
+      const outputMachineBinaryPath = path.join(tempDir, 'output_machine_bin.txt');
+      const outputMachineHexPath = path.join(tempDir, 'output_machine_hex.txt');
 
-      // Write source code to input.txt
+      // Clean up previous output files before new compilation
+      const outputFiles = [
+        outputPrintPath,
+        outputAssemblyPath,
+        outputMachineAssemblyPath,
+        outputMachineBinaryPath,
+        outputMachineHexPath
+      ];
+
+      outputFiles.forEach(filePath => {
+        try {
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+            console.log(`Cleaned up: ${filePath}`);
+          }
+        } catch (err) {
+          console.warn(`Could not delete ${filePath}:`, err.message);
+        }
+      });
+
+      // Write source code
       fs.writeFileSync(inputPath, sourceCode, 'utf-8');
 
       // Run compiler
       const compilerProcess = spawn(exePath, [], {
-        cwd: tempDir, // Important: compiler reads/writes txt files here
+        cwd: tempDir,
         stdio: ['pipe', 'pipe', 'pipe'],
       });
 
@@ -110,7 +131,11 @@ ipcMain.handle('run-compiler', async (event, sourceCode) => {
           outputs: {
             print: safeRead(outputPrintPath),
             assembly: safeRead(outputAssemblyPath),
-            machine: safeRead(outputMachinePath),
+            machine: {
+              assembly: safeRead(outputMachineAssemblyPath),
+              binary: safeRead(outputMachineBinaryPath),
+              hex: safeRead(outputMachineHexPath),
+            },
           },
         });
       });
