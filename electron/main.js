@@ -9,8 +9,11 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
+    minWidth: 900,
+    minHeight: 600,
     frame: false,
     titleBarStyle: 'hidden',
+    resizable: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,

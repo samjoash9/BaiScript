@@ -269,22 +269,25 @@ void convert_to_machine_code()
 
 void output_machine_file()
 {
-    FILE *f = fopen("output_machine.txt", "w");
-    if (!f)
+    FILE *f_assembly = fopen("output_machine_assembly.txt", "w");
+    FILE *f_bin = fopen("output_machine_bin.txt", "w");
+    FILE *f_hex = fopen("output_machine_hex.txt", "w");
+    if (!f_assembly || !f_bin || !f_hex)
     {
-        printf("ERROR: Cannot write output file!\n");
+        printf("ERROR: Cannot write output file for machine code!\n");
         return;
     }
 
     for (int i = 0; i < machine_code_count; i++)
     {
-        fprintf(f, "%-25s -> %s (0x%08X)\n",
-                machine_code_list[i].assembly,
-                machine_code_list[i].machine_bin,
-                machine_code_list[i].machine_hex);
+        fprintf(f_assembly, "%s\n", machine_code_list[i].assembly);
+        fprintf(f_bin, "%s\n", machine_code_list[i].machine_bin);
+        fprintf(f_hex, "%08X\n", machine_code_list[i].machine_hex);
     }
 
-    fclose(f);
+    fclose(f_assembly);
+    fclose(f_bin);
+    fclose(f_hex);
 }
 
 /* ===================== MAIN ENTRY ===================== */

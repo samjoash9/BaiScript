@@ -1,3 +1,1 @@
-KUAN a = 1 + 'a'!
-
-PRENT a + 2!
+PRENT "HELLO\r123"!

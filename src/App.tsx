@@ -95,34 +95,48 @@ export default function App() {
     input.click();
   };
 
+  const [notification, setNotification] = useState('');
+
   const handleExport = () => {
-    if (!targetCode) {
-      alert('Nothing to export!');
+    if (!targetCode || targetCode.includes("No assembly generated due to parse errors.")) {
+      setNotification('Nothing to export!');
+      setTimeout(() => setNotification(''), 3000); // disappear after 3s
       return;
     }
 
-    if (targetCode.includes("No assembly generated due to parse errors.")) {
-      alert('Nothing to export!');
-      return;
+    try {
+      const blob = new Blob([targetCode], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'assembly.txt';
+      a.click();
+
+      URL.revokeObjectURL(url);
+    } catch (error: any) {
+      setNotification('Export failed!');
+      setTimeout(() => setNotification(''), 3000);
+      console.error(error);
     }
-
-
-    const blob = new Blob([targetCode], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'assembly.txt';
-    a.click();
-
-    URL.revokeObjectURL(url);
   };
-
 
   return (
     <div className={`min-h-screen transition-colors ${theme === 'dark'
       ? 'bg-linear-to-br from-gray-950 via-gray-900 to-black text-gray-100'
       : 'bg-linear-to-br from-gray-50 via-white to-gray-100 text-gray-900'}`}>
+
+      {/* Notification Toast */}
+      {notification && (
+        <div
+          className={`fixed top-0 left-1/2 transform -translate-x-1/2 mt-4 px-6 py-4 rounded-xl shadow-lg z-50 text-lg font-semibold transition-all duration-300 ease-out
+      ${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-900'}
+      ${notification ? 'translate-y-0 opacity-100' : '-translate-y-12 opacity-0'}
+    `}
+        >
+          {notification}
+        </div>
+      )}
 
       {/* Header */}
       <header
@@ -145,17 +159,30 @@ export default function App() {
 
           {/* Header Buttons */}
           <div className="flex items-center gap-3" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-            <button type="button" onClick={handleClearInput} className={`px-4 py-2 rounded-lg border transition-all ${theme === 'dark'
-              ? 'border-gray-700 hover:border-gray-600 hover:bg-gray-800/50'
-              : 'border-gray-300/70 hover:border-gray-400 hover:bg-gray-100'}`}>
+            <button
+              type="button"
+              onClick={handleClearInput}
+              className={`px-4 py-2 rounded-lg transition-all
+                  ${theme === 'dark'
+                  ? 'border border-gray-700 hover:border-gray-600 hover:bg-gray-800/50'
+                  : 'border border-gray-400 hover:border-gray-500 hover:bg-gray-100'
+                }`}
+            >
               Clear Input
             </button>
 
-            <button type="button" onClick={handleClearOutput} className={`px-4 py-2 rounded-lg border transition-all ${theme === 'dark'
-              ? 'border-gray-700 hover:border-gray-600 hover:bg-gray-800/50'
-              : 'border-gray-300/70 hover:border-gray-400 hover:bg-gray-100'}`}>
+            <button
+              type="button"
+              onClick={handleClearOutput}
+              className={`px-4 py-2 rounded-lg transition-all
+              ${theme === 'dark'
+                  ? 'border border-gray-700 hover:border-gray-600 hover:bg-gray-800/50'
+                  : 'border border-gray-400 hover:border-gray-500 hover:bg-gray-100'
+                }`}
+            >
               Clear Output
             </button>
+
 
             <button type="button" onClick={handleRun} disabled={isRunning} className={`flex items-center gap-2 px-6 py-2 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed ${theme === 'dark'
               ? 'bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 text-white shadow-md hover:shadow-lg'
