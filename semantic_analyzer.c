@@ -816,6 +816,14 @@ void handle_declaration(ASTNode *decl_node, SEM_TYPE dtype)
             return;
         }
 
+        /* Also check symbol table (already-declared globally) */
+        if (find_symbol(name) != -1)
+        {
+            sem_record_error(decl_node,
+                "Duplicate declaration of variable '%s'", name);
+            return;
+        }
+
         /* Create new variable */
         KnownVar *kv = sem_add_var(name, dtype);
         if (!kv)
@@ -842,33 +850,9 @@ void handle_declaration(ASTNode *decl_node, SEM_TYPE dtype)
         const char *name = decl_node->left->value;
         ASTNode *init_expr = decl_node->right;
 
-        KnownVar *existing = sem_find_var(name);
-        if (existing) {
-            /* If existing has concrete type different from what initializer implies, error */
-            SEM_TEMP val = evaluate_expression(init_expr);
-            SEM_TYPE inferred = (val.type != SEM_TYPE_UNKNOWN) ? val.type : SEM_TYPE_INT;
-            if (existing->temp.type != SEM_TYPE_UNKNOWN && inferred != SEM_TYPE_UNKNOWN
-                && existing->temp.type != inferred) {
-                sem_record_error(decl_node, "Redeclaration/initializer type mismatch for '%s'", name);
-                return;
-            }
-            /* otherwise allow initialization to set value/type if unknown */
-            if (existing->temp.type == SEM_TYPE_UNKNOWN)
-                existing->temp.type = inferred;
-            existing->temp.is_constant = val.is_constant;
-            existing->temp.int_value = val.is_constant ? val.int_value : 0;
-            existing->initialized = 1;
-
-            int idx = find_symbol(name);
-            if (idx != -1) {
-                symbol_table[idx].initialized = 1;
-                if (existing->temp.type == SEM_TYPE_INT)
-                    snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", existing->temp.int_value);
-                else
-                    snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%c", (char)existing->temp.int_value);
-                if (existing->temp.type == SEM_TYPE_INT) strcpy(symbol_table[idx].datatype, "ENTEGER");
-                else if (existing->temp.type == SEM_TYPE_CHAR) strcpy(symbol_table[idx].datatype, "CHAROT");
-            }
+        /* If already declared (in known vars or symbol table), it's an error */
+        if (sem_find_var(name) || find_symbol(name) != -1) {
+            sem_record_error(decl_node, "Redeclaration of variable '%s'", name);
             return;
         }
 
@@ -876,7 +860,7 @@ void handle_declaration(ASTNode *decl_node, SEM_TYPE dtype)
         KnownVar *kv = sem_add_var(name, SEM_TYPE_UNKNOWN);
         if (!kv)
         {
-            sem_record_error(decl_node, "Redeclaration of variable '%s'", name);
+            sem_record_error(decl_node, "Failed to declare variable '%s'", name);
             return;
         }
 
@@ -911,7 +895,6 @@ void handle_declaration(ASTNode *decl_node, SEM_TYPE dtype)
     handle_declaration(decl_node->left, dtype);
     handle_declaration(decl_node->right, dtype);
 }
-
 
 
 
