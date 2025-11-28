@@ -1546,7 +1546,7 @@ yyreduce:
   case 18:
 /* Line 1792 of yacc.c  */
 #line 94 "yacc.y"
-    { (yyval.node) = new_node(NODE_LITERAL, (yyvsp[(1) - (1)].str), NULL, NULL, lineCount); }
+    { (yyval.node) = new_node(NODE_STRING_LITERAL, (yyvsp[(1) - (1)].str), NULL, NULL, lineCount); }
     break;
 
   case 19:

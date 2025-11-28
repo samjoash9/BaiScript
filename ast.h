@@ -17,7 +17,8 @@ typedef enum NodeType {
     NODE_TERM,
     NODE_UNARY_OP,
     NODE_POSTFIX_OP,
-    NODE_FACTOR 
+    NODE_FACTOR,
+    NODE_STRING_LITERAL
 } NodeType;
 
 

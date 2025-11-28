@@ -1,3 +1,7 @@
-KUAN a!
-CHAROT b!
-KUAN a!
+CHAROT c = 'h'!
+CHAROT c1 = 'e'!
+CHAROT c2 = 'l'!
+CHAROT c3 = 'l'!
+CHAROT c4 = 'o'!
+
+PRENT c, c1, c2, c3, c4!

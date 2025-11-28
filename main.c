@@ -209,12 +209,12 @@ int main()
     // Return appropriate exit code
     if (result != 0 || parse_failed || sem_errors > 0)
     {
-        printf("[MAIN] Compilation failed with errors\n");
+        printf("\n\n[MAIN] Compilation failed with errors\nn");
         return 1;
     }
     else
     {
-        printf("[MAIN] Compilation successful\n");
+        printf("\n\n[MAIN] Compilation successful\n\n");
         return 0;
     }
 }

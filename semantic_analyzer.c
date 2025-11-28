@@ -754,11 +754,33 @@ static void handle_print(ASTNode *print_node)
     {
         ASTNode *expr = item->left ? item->left : item;
 
+    if (expr->type == NODE_STRING_LITERAL) {
+        const char *s = expr->value;
+        size_t len = strlen(s);
+
+        // remove the surrounding quotes
+        if (len >= 2) {
+            char temp[1024];
+            size_t outlen = len - 2;   // content length between quotes
+            if (outlen >= sizeof(temp))
+                outlen = sizeof(temp) - 1;
+
+            strncpy(temp, s + 1, outlen);
+            temp[outlen] = '\0';
+
+            buffer_print(temp);
+        }
+
+        item = item->right;
+        continue;
+    }
+
+
         char tempbuf[1024] = {0};
 
         // Evaluate expression
         SEM_TEMP val = evaluate_expression(expr);
-
+        
         // If identifier, update usage
         if (expr->type == NODE_IDENTIFIER)
         {
@@ -833,6 +855,8 @@ void handle_declaration(ASTNode *decl_node, SEM_TYPE dtype)
             return;
         }
 
+        kv->temp.type = dtype; // store declared type
+
         /* Default initialization for typed variables */
         if (dtype == SEM_TYPE_INT || dtype == SEM_TYPE_CHAR)
         {
@@ -856,7 +880,7 @@ void handle_declaration(ASTNode *decl_node, SEM_TYPE dtype)
             return;
         }
 
-        /* create new as before */
+        /* create new variable */
         KnownVar *kv = sem_add_var(name, SEM_TYPE_UNKNOWN);
         if (!kv)
         {
@@ -865,12 +889,25 @@ void handle_declaration(ASTNode *decl_node, SEM_TYPE dtype)
         }
 
         SEM_TEMP val = evaluate_expression(init_expr);
-        if (kv->temp.type == SEM_TYPE_UNKNOWN)
+
+        // --- KUAN adopts RHS type, others keep declared type ---
+        if (dtype == SEM_TYPE_UNKNOWN) // KUAN
         {
-            if (val.type == SEM_TYPE_INT) kv->temp.type = SEM_TYPE_INT;
-            else if (val.type == SEM_TYPE_CHAR) kv->temp.type = SEM_TYPE_CHAR;
-            else kv->temp.type = SEM_TYPE_INT;
+            kv->temp.type = val.type != SEM_TYPE_UNKNOWN ? val.type : SEM_TYPE_INT;
+            kv->temp.type = kv->temp.type;
         }
+        else
+        {
+            kv->temp.type = dtype;
+            kv->temp.type = dtype;
+
+            // force value conversion if needed
+            if (dtype == SEM_TYPE_INT && val.type == SEM_TYPE_CHAR)
+                val.int_value = (int)val.int_value;
+            else if (dtype == SEM_TYPE_CHAR && val.type == SEM_TYPE_INT)
+                val.int_value = (char)val.int_value;
+        }
+
         kv->temp.is_constant = val.is_constant;
         kv->temp.int_value = val.is_constant ? val.int_value : 0;
         kv->initialized = 1;
@@ -883,6 +920,7 @@ void handle_declaration(ASTNode *decl_node, SEM_TYPE dtype)
                 snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", kv->temp.int_value);
             else if (kv->temp.type == SEM_TYPE_CHAR)
                 snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%c", (char)kv->temp.int_value);
+
             if (kv->temp.type == SEM_TYPE_INT)
                 strcpy(symbol_table[idx].datatype, "ENTEGER");
             else
@@ -895,7 +933,6 @@ void handle_declaration(ASTNode *decl_node, SEM_TYPE dtype)
     handle_declaration(decl_node->left, dtype);
     handle_declaration(decl_node->right, dtype);
 }
-
 
 
 static void handle_assignment(ASTNode *assign_node)
@@ -916,55 +953,35 @@ static void handle_assignment(ASTNode *assign_node)
     KnownVar *kv = sem_find_var(name);
     if (!kv)
     {
-        // Default to KUAN if not declared
+        // KUAN default if not declared
         kv = sem_add_var(name, SEM_TYPE_UNKNOWN);
+        kv->temp.type = SEM_TYPE_UNKNOWN;
     }
 
-    // Evaluate RHS
     SEM_TEMP rhs_temp = evaluate_expression(rhs);
 
-    // --- Propagate type for KUAN ---
-    if (kv->temp.type == SEM_TYPE_UNKNOWN)
+    // --- Respect declared type ---
+    if (kv->temp.type != SEM_TYPE_UNKNOWN)
     {
+        kv->temp.type = kv->temp.type;
+
+        // force conversion if needed
+        if (kv->temp.type == SEM_TYPE_INT && rhs_temp.type == SEM_TYPE_CHAR)
+            rhs_temp.int_value = (int)rhs_temp.int_value;
+        else if (kv->temp.type == SEM_TYPE_CHAR && rhs_temp.type == SEM_TYPE_INT)
+            rhs_temp.int_value = (char)rhs_temp.int_value;
+    }
+    else
+    {
+        // KUAN adopts RHS type
         kv->temp.type = rhs_temp.type != SEM_TYPE_UNKNOWN ? rhs_temp.type : SEM_TYPE_INT;
+        kv->temp.type = kv->temp.type;
     }
 
-    // Determine final type for compound operations (optional)
-    SEM_TYPE final_type = kv->temp.type;
-
-    // Compute new value
     long newval = rhs_temp.is_constant ? rhs_temp.int_value : 0;
 
-    // Handle compound assignment
-    if (assign_node->value && strlen(assign_node->value) == 2) // e.g., "+="
-    {
-        const char *op = assign_node->value;
-        long lhs_val = kv->temp.is_constant ? kv->temp.int_value : 0;
-
-        if (strcmp(op, "+=") == 0) newval = lhs_val + newval;
-        else if (strcmp(op, "-=") == 0) newval = lhs_val - newval;
-        else if (strcmp(op, "*=") == 0) newval = lhs_val * newval;
-        else if (strcmp(op, "/=") == 0)
-        {
-            if (newval == 0)
-            {
-                sem_record_error(assign_node, "Division by zero in assignment");
-                newval = 0;
-            }
-            else newval = lhs_val / newval;
-        }
-
-        // Promote CHAR operands if necessary
-        if (kv->temp.type == SEM_TYPE_CHAR || rhs_temp.type == SEM_TYPE_CHAR)
-            final_type = SEM_TYPE_CHAR;
-        else
-            final_type = SEM_TYPE_INT;
-    }
-
-    // Store final value
     kv->temp.int_value = newval;
     kv->temp.is_constant = 1;
-    kv->temp.type = final_type;
     kv->initialized = 1;
 
     // Update symbol table
@@ -972,16 +989,15 @@ static void handle_assignment(ASTNode *assign_node)
     if (idx != -1)
     {
         symbol_table[idx].initialized = 1;
-        if (final_type == SEM_TYPE_INT)
+        if (kv->temp.type == SEM_TYPE_INT)
             snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", newval);
-        else if (final_type == SEM_TYPE_CHAR)
+        else if (kv->temp.type == SEM_TYPE_CHAR)
             snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%c", (char)newval);
 
-        if (final_type == SEM_TYPE_INT) strcpy(symbol_table[idx].datatype, "ENTEGER");
-        else if (final_type == SEM_TYPE_CHAR) strcpy(symbol_table[idx].datatype, "CHAROT");
+        if (kv->temp.type == SEM_TYPE_INT) strcpy(symbol_table[idx].datatype, "ENTEGER");
+        else if (kv->temp.type == SEM_TYPE_CHAR) strcpy(symbol_table[idx].datatype, "CHAROT");
     }
 }
-
 
 /* ----------------------------
    AST traversal

@@ -91,7 +91,7 @@ PRINT_LIST_PRIME:
 
 PRINT_ITEM:
       SIMPLE_EXPR              { $$ = $1; }
-    | STRING_LITERAL           { $$ = new_node(NODE_LITERAL, $1, NULL, NULL, lineCount); }
+    | STRING_LITERAL           { $$ = new_node(NODE_STRING_LITERAL, $1, NULL, NULL, lineCount); }
 ;
 
 /* Declarations */
