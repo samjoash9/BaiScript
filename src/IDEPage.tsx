@@ -83,13 +83,15 @@ export default function IDEPage() {
     const handleRun = async () => {
         if (!sourceCode.trim()) {
             setOutput('Error: Source code is empty.');
+            setTargetCode('');
+            setMachineCode('');
             return;
         }
 
         setIsRunning(true);
         setOutput('');
         setTargetCode('');
-        setMachineCode(''); // Reset to empty string
+        setMachineCode('');
 
         if (window.electronAPI) {
             try {
@@ -139,7 +141,7 @@ export default function IDEPage() {
 
                     // For target code, show error or partial output
                     if (result.outputs?.assembly && result.outputs.assembly.trim().length > 0) {
-                        setTargetCode(result.outputs.assembly + '\n\n--- Partial output due to compilation errors ---');
+                        setTargetCode(result.outputs.assembly + '\n');
                     } else {
                         setTargetCode('No assembly generated due to compilation errors');
                     }
