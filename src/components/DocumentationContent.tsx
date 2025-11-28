@@ -77,9 +77,9 @@ function DatatypesSection({ textColor, subTextColor }: { textColor: string; subT
                         <p className={`${subTextColor} mb-3`}>
                             Represents whole numbers. Use the <code>ENTEGER</code> keyword to declare integer variables.
                         </p>
-                        <CodeBlock code={`ENTEGER a = 1!;
-ENTEGER b = -10!;
-ENTEGER c = 0!;`} language="baiscript" />
+                        <CodeBlock code={`ENTEGER a = 1!
+ENTEGER b = -10!
+ENTEGER c = 0!`} language="baiscript" />
                     </div>
 
                     <div>
@@ -87,8 +87,8 @@ ENTEGER c = 0!;`} language="baiscript" />
                         <p className={`${subTextColor} mb-3`}>
                             Represents a single character. Use the <code>CHAROT</code> keyword to declare character variables.
                         </p>
-                        <CodeBlock code={`CHAROT letter = 'a'!;
-CHAROT symbol = '!';`} language="baiscript" />
+                        <CodeBlock code={`CHAROT letter = 'a'!
+CHAROT symbol = '!'!`} language="baiscript" />
                     </div>
 
                     <div>
@@ -215,7 +215,8 @@ b--!      // decrement after using`} language="baiscript" />
                 <CodeBlock code={`ENTEGER a = 5!
 ENTEGER b = 3!
 ENTEGER c = ++a + b--!  // a is incremented first, b used then decremented
-ENTEGER d = -c * 2!`} language="baiscript" />
+ENTEGER d = -c * 2!`
+                } language="baiscript" />
             </section>
         </div>
     );
