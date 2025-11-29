@@ -1,1 +1,5 @@
-ENTEGER a = 1!
+ENTEGER a = 100!
+
+CHAROT b = a!
+
+PRENT b!
