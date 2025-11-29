@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import MonacoEditor from '@monaco-editor/react';
 import { Terminal, Code, Cpu, FileCode } from 'lucide-react';
 
@@ -27,7 +26,6 @@ export function CodeEditor({
   onChange,
   readOnly = false,
   editable = false,
-  placeholder = '',
   language = 'text',
   theme = 'dark',
 }: CodeEditorProps) {
@@ -55,7 +53,6 @@ export function CodeEditor({
   };
 
   const getTextColor = () => (isDark ? 'text-white' : 'text-black');
-  const getPlaceholderColor = () => (isDark ? 'placeholder:text-gray-500' : 'placeholder:text-gray-400');
   const getBorderColor = () => (isDark ? 'border-gray-700/50' : 'border-gray-300/50');
   const get_bg_color = () => (isDark ? '' : 'bg-white');
 
