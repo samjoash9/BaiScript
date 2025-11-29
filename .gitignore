@@ -1,7 +1,9 @@
+input.txt
 output_assembly.txt
 output_machine_assembly.txt
 output_machine_bin.txt
 output_machine_hex.txt
+output_machine.txt
 output_print.txt
 output_tac.txt
 parser.exe
