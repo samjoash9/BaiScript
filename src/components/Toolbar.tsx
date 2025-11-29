@@ -1,4 +1,4 @@
-import { File, FolderOpen, Save, Download, Upload, Zap } from 'lucide-react';
+import { Download, Upload } from 'lucide-react';
 
 
 export function Toolbar({
