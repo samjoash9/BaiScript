@@ -1,5 +1,5 @@
 import { Terminal, Code, Cpu, FileCode } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface MachineCodeValue {
   assembly: string;
@@ -32,6 +32,7 @@ export function CodeEditor({
 }: CodeEditorProps) {
   const isDark = theme === 'dark';
   const [editorText, setEditorText] = useState<string>('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Sync editorText with value prop correctly
   useEffect(() => {
@@ -45,6 +46,14 @@ export function CodeEditor({
       setEditorText(JSON.stringify(value, null, 2));
     }
   }, [value, title]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    if (title.includes('Source') && onChange) {
+      const newValue = e.target.value;
+      setEditorText(newValue);
+      onChange(newValue);
+    }
+  };
 
   const getIcon = () => {
     if (title.includes('Source')) return <FileCode className="w-4 h-4" />;
@@ -136,8 +145,9 @@ export function CodeEditor({
           </div>
         )}
         <textarea
+          ref={textareaRef}
           value={editorText}
-          onChange={(e) => title.includes('Source') && onChange?.(e.target.value) && setEditorText(e.target.value)}
+          onChange={handleChange}
           readOnly={!editable || readOnly || !title.includes('Source')}
           placeholder={placeholder}
           spellCheck={false}
