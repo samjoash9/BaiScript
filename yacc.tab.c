@@ -2025,7 +2025,8 @@ void yyerror(const char *s) {
     if (islexerror == 0) {               // only log if no previous error
         FILE *out = fopen("output_print.txt", "w"); // overwrite
         if (out) {
-            fprintf(out, "[PARSE] Syntax Invalid [line:%d]\n", lineCount);
+            /* fprintf(out, "[PARSE] Syntax Error [line:%d]\n", lineCount); */
+            fprintf(out, "Syntax Error [line:%d]\n", lineCount); 
             fclose(out);
         }
         islexerror = 1;                  // mark that an error was logged

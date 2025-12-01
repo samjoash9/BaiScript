@@ -67,14 +67,29 @@ extern void yyerror(const char *s);
 \n                    { lineCount++; printf("[LEX] NEWLINE\n"); }
 
 
+
+\'\' {
+
+    if (islexerror == 0) {                                              // only log the first error
+        FILE *out = fopen("output_print.txt", "w");                     // overwrite the file
+        if(out) {
+            fprintf(out, "Invalid Empty Character [line:%d]\n", lineCount);
+            fclose(out);
+        }
+        islexerror = 1;                                                 // mark that an error was logged
+    }
+    parse_failed = 1;
+}
+
 .                     {
-                        if (islexerror == 0) {              // only log the first error
-                            FILE *out = fopen("output_print.txt", "w"); // overwrite the file
+                        if (islexerror == 0) {                                                              // only log the first error
+                            FILE *out = fopen("output_print.txt", "w");                                     // overwrite the file
                             if(out) {
-                                fprintf(out, "[LEX] Invalid (%s) [line:%d]\n", yytext, lineCount);
+                                /* fprintf(out, "[LEX] Invalid (%s) [line:%d]\n", yytext, lineCount); */
+                                fprintf(out, "Invalid Character (%s) [line:%d]\n", yytext, lineCount);
                                 fclose(out);
                             }
-                            islexerror = 1;                 // mark that an error was logged
+                            islexerror = 1;                                                                 // mark that an error was logged
                         }
                         parse_failed = 1;
                       }
