@@ -1,6 +1,7 @@
+ENTEGER J1 = 1!
+PRENT ++J1 + J1++!
+PRENT J1!
 
-ENTEGER y2 = 1!
-
-y2 += 1!
-
-PRENT y2!
+ENTEGER f = 1!
+f = ++f + f++!
+PRENT f!

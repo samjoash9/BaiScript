@@ -191,7 +191,6 @@ int main()
     else if (result == 0 && !parse_failed)
     {
         generate_machine_code();
-        printf("[MAIN] Machine code generation completed.\n");
     }
     else
     {
