@@ -587,61 +587,36 @@ static SEM_TEMP evaluate_expression(ASTNode *node)
             return t;
         }
     }
-    case NODE_POSTFIX_OP:
-    {
+    case NODE_POSTFIX_OP: {
         const char *op = node->value ? node->value : "";
         ASTNode *target = node->left;
-        if (!target || target->type != NODE_IDENTIFIER)
-        {
+        if (!target || target->type != NODE_IDENTIFIER) {
             sem_record_error(node, "Postfix %s applied to non-identifier", op);
             return sem_new_temp(SEM_TYPE_UNKNOWN);
         }
+
         const char *name = target->value;
         KnownVar *kv = sem_find_var(name);
         if (!kv)
             kv = sem_add_var(name, SEM_TYPE_INT);
-        if (kv && sem_inside_print)
-            kv->used = 1;
-
-        SEM_TEMP ret = kv->temp;
-        ret.node = node;
 
         if (!kv->initialized)
-        {
-            if (!sem_inside_print) // only warn if NOT inside PRENT
-                sem_record_error(target, "Use of uninitialized variable '%s' in postfix operation", name);
-            ret.is_constant = 0;
-        }
+            sem_record_error(target, "Use of uninitialized variable '%s' in postfix", name);
 
+        SEM_TEMP ret = kv->temp; // return current value
+        ret.node = node;
+
+        // Determine delta
         int delta = 0;
-        if (strcmp(op, "++") == 0)
-            delta = 1;
-        else if (strcmp(op, "--") == 0)
-            delta = -1;
+        if (strcmp(op, "++") == 0) delta = 1;
+        else if (strcmp(op, "--") == 0) delta = -1;
 
+        // **Defer the delta instead of applying immediately**
         if (delta != 0)
-        {
-            long before = (ret.is_constant ? ret.int_value : 0);
-            long after = before + delta;
+            push_deferred_op(kv, delta);
 
-            kv->temp.is_constant = 1;
-            kv->temp.int_value = after;
-            kv->initialized = 1;
-
-            int idx = find_symbol(kv->name);
-            if (idx != -1)
-            {
-                symbol_table[idx].initialized = 1;
-                snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", after);
-            }
-
-            ret.is_constant = 1;
-            ret.int_value = before; 
-        }
-
-        return ret;
+        return ret;  // return old value
     }
-
     case NODE_ASSIGNMENT:
     {
         ASTNode *lhs = node->left;
@@ -951,35 +926,47 @@ static void handle_assignment(ASTNode *assign_node)
 
     const char *name = lhs->value;
     KnownVar *kv = sem_find_var(name);
+
     if (!kv)
     {
-        // KUAN default if not declared
+        // If variable not declared, create it
         kv = sem_add_var(name, SEM_TYPE_UNKNOWN);
-        kv->temp.type = SEM_TYPE_UNKNOWN;
     }
 
+    // Evaluate RHS
     SEM_TEMP rhs_temp = evaluate_expression(rhs);
 
-    // --- Respect declared type ---
-    if (kv->temp.type != SEM_TYPE_UNKNOWN)
-    {
-        kv->temp.type = kv->temp.type;
+    // Determine old value
+    long oldval = 0;
+    if (kv->initialized)
+        oldval = kv->temp.int_value;
 
-        // force conversion if needed
-        if (kv->temp.type == SEM_TYPE_INT && rhs_temp.type == SEM_TYPE_CHAR)
-            rhs_temp.int_value = (int)rhs_temp.int_value;
-        else if (kv->temp.type == SEM_TYPE_CHAR && rhs_temp.type == SEM_TYPE_INT)
-            rhs_temp.int_value = (char)rhs_temp.int_value;
+    // Compute new value based on assignment type
+    long newval = rhs_temp.is_constant ? rhs_temp.int_value : 0;
+    const char *op = assign_node->value ? assign_node->value : "=";
+
+    if      (strcmp(op, "+=") == 0) newval = oldval + rhs_temp.int_value;
+    else if (strcmp(op, "-=") == 0) newval = oldval - rhs_temp.int_value;
+    else if (strcmp(op, "*=") == 0) newval = oldval * rhs_temp.int_value;
+    else if (strcmp(op, "/=") == 0)
+    {
+        if (rhs_temp.int_value == 0)
+            sem_record_error(assign_node, "Division by zero");
+        else
+            newval = oldval / rhs_temp.int_value;
+    }
+    else if (strcmp(op, "=") == 0)
+    {
+        // simple assignment, just take RHS
+        newval = rhs_temp.int_value;
     }
     else
     {
-        // KUAN adopts RHS type
-        kv->temp.type = rhs_temp.type != SEM_TYPE_UNKNOWN ? rhs_temp.type : SEM_TYPE_INT;
-        kv->temp.type = kv->temp.type;
+        sem_record_error(assign_node, "Unknown assignment operator '%s'", op);
+        newval = oldval; // fallback
     }
 
-    long newval = rhs_temp.is_constant ? rhs_temp.int_value : 0;
-
+    // Update variable
     kv->temp.int_value = newval;
     kv->temp.is_constant = 1;
     kv->initialized = 1;
@@ -993,11 +980,9 @@ static void handle_assignment(ASTNode *assign_node)
             snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", newval);
         else if (kv->temp.type == SEM_TYPE_CHAR)
             snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%c", (char)newval);
-
-        if (kv->temp.type == SEM_TYPE_INT) strcpy(symbol_table[idx].datatype, "ENTEGER");
-        else if (kv->temp.type == SEM_TYPE_CHAR) strcpy(symbol_table[idx].datatype, "CHAROT");
     }
 }
+
 
 /* ----------------------------
    AST traversal

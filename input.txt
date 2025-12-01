@@ -1,1 +1,5 @@
-ENTEGER a, b, c = 1!
+ENTEGER a = 1, b, c!
+
+b = c = a!
+
+a += a!
