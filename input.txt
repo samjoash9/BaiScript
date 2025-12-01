@@ -1,7 +1,0 @@
-ENTEGER J1 = 1!
-PRENT ++J1 + J1++!
-PRENT J1!
-
-ENTEGER f = 1!
-f = ++f + f++!
-PRENT f!

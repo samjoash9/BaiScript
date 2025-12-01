@@ -50,7 +50,7 @@ static void sem_record_error(ASTNode *node, const char *fmt, ...)
     if (!out_file)
         return;
 
-    fprintf(out_file, "[SEM ERROR] ");
+    fprintf(out_file, "ERROR: ");
 
     va_list ap;
     va_start(ap, fmt);
@@ -67,8 +67,6 @@ static void sem_record_warning(ASTNode *node, const char *fmt, ...)
 
     if (!out_file)
         return;
-
-    fprintf(out_file, "[SEM WARNING] ");
 
     va_list ap;
     va_start(ap, fmt);
@@ -1041,7 +1039,7 @@ static void check_unused_variables(void)
     {
         ASTNode *node = k->temp.node;
         if (!k->used)
-            sem_record_warning(node, "Variable '%s' declared but never used", k->name);
+            sem_record_warning(node, "Variable '%s' declared but never use\n", k->name);
     }
 }
 
@@ -1054,7 +1052,7 @@ int semantic_analyzer(void)
     out_file = fopen("output_print.txt", "w");
     if (!out_file)
     {
-        fprintf(stderr, "[SEM] Failed to open output_print.txt\n");
+        fprintf(stderr, "Failed to open output_print.txt\n");
         return 0;
     }
 
@@ -1079,7 +1077,7 @@ int semantic_analyzer(void)
 
     if (!root)
     {
-        fprintf(stderr, "[SEM] No AST\n");
+        fprintf(stderr, "No AST\n");
         fclose(out_file);
         return 0;
     }
@@ -1105,7 +1103,8 @@ int semantic_analyzer(void)
         // Write semantic analysis summary
         fprintf(out_file, "\n\n=== COMPILATION SUCCESSFULL ===\n\n");
         check_unused_variables();
-        fprintf(out_file, "[SEM] Analysis completed: %d semantic error(s), %d warning(s)\n", sem_errors, sem_warnings);
+        // fprintf(out_file, "[SEM] Analysis completed: %d semantic error(s), %d warning(s)\n", sem_errors, sem_warnings);
+        fprintf(out_file, "\n%d semantic error(s), %d warning(s)\n", sem_errors, sem_warnings);
     }
 
     fclose(out_file);

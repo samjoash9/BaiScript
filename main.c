@@ -104,7 +104,6 @@ int main()
         write_assembly_error_file(parse_error_msg);
         write_machine_error_files("No machine code generated due to parse errors.");
         write_tac_error_file("No TAC generated due to parse errors.");
-        write_print_error_file("[MAIN] Compilation failed due to parse errors.");
     }
 
     printf("\n=== BaiScript IS PARSED! ===\n");
@@ -208,7 +207,7 @@ int main()
     // Return appropriate exit code
     if (result != 0 || parse_failed || sem_errors > 0)
     {
-        printf("\n\n[MAIN] Compilation failed with errors\nn");
+        printf("\n\nCompilation failed with errors\n\n");
         return 1;
     }
     else
