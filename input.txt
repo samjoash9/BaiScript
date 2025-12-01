@@ -1,5 +1,6 @@
-KUAN a = 1!
-CHAROT ab = 97!
 
-KUAN result = a + ab!
-PRENT result!
+ENTEGER y2 = 1!
+
+y2 += 1!
+
+PRENT y2!
