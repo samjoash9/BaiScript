@@ -155,6 +155,7 @@ static void apply_deferred_ops(void)
         kv->temp.is_constant = 1;
         kv->temp.int_value = after;
         kv->initialized = 1;
+        kv->used = 1;
 
         int idx = find_symbol(kv->name);
         if (idx != -1)
@@ -595,9 +596,10 @@ static SEM_TEMP evaluate_expression(ASTNode *node)
 
         const char *name = target->value;
         KnownVar *kv = sem_find_var(name);
-        if (!kv)
-            kv = sem_add_var(name, SEM_TYPE_INT);
-
+        if (!kv) {
+            sem_record_error(node, "Use of undeclared variable '%s'", name);
+            return sem_new_temp(SEM_TYPE_UNKNOWN);
+        }
         if (!kv->initialized)
             sem_record_error(target, "Use of uninitialized variable '%s' in postfix", name);
 
@@ -968,7 +970,8 @@ static void handle_assignment(ASTNode *assign_node)
     kv->temp.int_value = newval;
     kv->temp.is_constant = 1;
     kv->initialized = 1;
-
+    kv->used = 1;
+    
     // Update symbol table
     int idx = find_symbol(name);
     if (idx != -1)

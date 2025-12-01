@@ -1,0 +1,6 @@
+
+ENTEGER yellow  = 1!
+yellow++!
+yellow--!
+
+PRENT yellow!
