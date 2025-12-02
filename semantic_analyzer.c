@@ -9,7 +9,7 @@
 #include <ctype.h>
 
 /* ----------------------------
-   Internal structures
+Internal structures
 ---------------------------- */
 
 static SEM_TEMP *sem_temps = NULL;
@@ -40,7 +40,7 @@ typedef struct DeferredOp
 static DeferredOp *deferred_head = NULL;
 
 /* ----------------------------
-   Helpers: error/warning
+Helpers: error/warning
 ---------------------------- */
 
 static void sem_record_error(ASTNode *node, const char *fmt, ...)
@@ -78,7 +78,7 @@ static void sem_record_warning(ASTNode *node, const char *fmt, ...)
 }
 
 /* ----------------------------
-   Dynamic arrays helpers
+Dynamic arrays helpers
 ---------------------------- */
 
 static int ensure_temp_capacity(void)
@@ -110,8 +110,8 @@ static int ensure_ops_capacity(void)
 }
 
 /* ----------------------------
-   Deferred postfix helpers
-   (retained but not used for current immediate semantics)
+Deferred postfix helpers
+(retained but not used for current immediate semantics)
 ---------------------------- */
 static void push_deferred_op(KnownVar *kv, int delta)
 {
@@ -177,7 +177,7 @@ static void apply_deferred_ops(void)
 }
 
 /* ----------------------------
-   Public helpers
+Public helpers
 ---------------------------- */
 
 SEM_TEMP sem_new_temp(SEM_TYPE type)
@@ -256,7 +256,7 @@ SEM_TYPE sem_type_from_string(const char *s)
 }
 
 /* ----------------------------
-   Constant helpers
+Constant helpers
 ---------------------------- */
 
 static int try_parse_int(const char *s, long *out)
@@ -297,9 +297,6 @@ static int try_parse_char_literal(const char *lex, long *out)
         case 't':
             *out = '\t';
             return 1;
-        case 'r':
-            *out = '\r';
-            return 1;
         case '0':
             *out = '\0';
             return 1;
@@ -320,7 +317,7 @@ static int try_parse_char_literal(const char *lex, long *out)
 }
 
 /* ----------------------------
-   Expression evaluation
+Expression evaluation
 ---------------------------- */
 
 static SEM_TEMP evaluate_expression(ASTNode *node);
@@ -695,7 +692,7 @@ static SEM_TEMP evaluate_expression(ASTNode *node)
 }
 
 /* ----------------------------
-   Buffers for output
+Buffers for output
 ---------------------------- */
 #define PRINT_BUFFER_SIZE 8192
 static char print_buffer[PRINT_BUFFER_SIZE];
@@ -714,8 +711,47 @@ static void buffer_print(const char *s)
 }
 
 
+/* Unescape C-like escape sequences from src into dst.
+Supports: \n, \t, \r, \0, \\, \", \', and simple unknown-escape passthrough.
+dstsize is total buffer size for dst (including null).
+*/
+static void unescape_string(const char *src, char *dst, size_t dstsize)
+{
+    if (!src || !dst || dstsize == 0) return;
+    size_t i = 0, j = 0;
+    while (src[i] != '\0' && j + 1 < dstsize) /* leave room for null */
+    {
+        if (src[i] == '\\')
+        {
+            i++;
+            if (src[i] == '\0') break;
+            char c = src[i];
+            switch (c)
+            {
+                case 'n': dst[j++] = '\n'; break;
+                case 't': dst[j++] = '\t'; break;
+                case '0': dst[j++] = '\0'; break;
+                case '\\': dst[j++] = '\\'; break;
+                case '"': dst[j++] = '"'; break;
+                case '\'': dst[j++] = '\''; break;
+                default:
+                    /* unknown escape: copy char as-is (e.g. \z -> z) */
+                    dst[j++] = c;
+                    break;
+            }
+            i++;
+        }
+        else
+        {
+            dst[j++] = src[i++];
+        }
+    }
+    dst[j] = '\0';
+}
+
+
 /* ----------------------------
-   Handle print statements (printf-like)
+Handle print statements (printf-like)
 ---------------------------- */
 static void handle_print(ASTNode *print_node)
 {
@@ -729,27 +765,29 @@ static void handle_print(ASTNode *print_node)
     {
         ASTNode *expr = item->left ? item->left : item;
 
-    if (expr->type == NODE_STRING_LITERAL) {
-        const char *s = expr->value;
-        size_t len = strlen(s);
+        if (expr->type == NODE_STRING_LITERAL) {
+            const char *s = expr->value;
+            size_t len = s ? strlen(s) : 0;
 
-        // remove the surrounding quotes
-        if (len >= 2) {
-            char temp[1024];
-            size_t outlen = len - 2;   // content length between quotes
-            if (outlen >= sizeof(temp))
-                outlen = sizeof(temp) - 1;
+            if (len >= 2) {
+                /* copy inner content (between the quotes) into a temporary buffer */
+                char raw[1024];
+                size_t content_len = len - 2;
+                if (content_len >= sizeof(raw))
+                    content_len = sizeof(raw) - 1;
 
-            strncpy(temp, s + 1, outlen);
-            temp[outlen] = '\0';
+                strncpy(raw, s + 1, content_len);
+                raw[content_len] = '\0';
 
-            buffer_print(temp);
+                /* unescape into another buffer and then print */
+                char unesc[1024];
+                unescape_string(raw, unesc, sizeof(unesc));
+                buffer_print(unesc);
+            }
+
+            item = item->right;
+            continue;
         }
-
-        item = item->right;
-        continue;
-    }
-
 
         char tempbuf[1024] = {0};
 
@@ -792,7 +830,7 @@ static void handle_print(ASTNode *print_node)
 
 
 /* ----------------------------
-   Declaration & assignment
+Declaration & assignment
 ---------------------------- */
 void handle_declaration(ASTNode *decl_node, SEM_TYPE dtype)
 {
@@ -986,7 +1024,7 @@ static void handle_assignment(ASTNode *assign_node)
 
 
 /* ----------------------------
-   AST traversal
+AST traversal
 ---------------------------- */
 
 static void analyze_node(ASTNode *node)
@@ -1033,7 +1071,7 @@ static void analyze_node(ASTNode *node)
 }
 
 /* ----------------------------
-   Check unused
+Check unused
 ---------------------------- */
 
 static void check_unused_variables(void)
@@ -1047,7 +1085,7 @@ static void check_unused_variables(void)
 }
 
 /* ----------------------------
-   Semantic analyzer
+Semantic analyzer
 ---------------------------- */
 int semantic_analyzer(void)
 {
