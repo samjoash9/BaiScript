@@ -1,6 +1,3 @@
+ENTEGER POWER_HOUSE = 1!
 
-ENTEGER yellow  = 1!
-yellow++!
-yellow--!
-
-PRENT yellow!
+PRENT ++POWER_HOUSE + POWER_HOUSE++!

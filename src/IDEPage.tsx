@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CodeEditor } from './components/CodeEditor';
 import { Toolbar } from './components/Toolbar';
@@ -80,7 +80,9 @@ export default function IDEPage() {
 
     const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
 
-    const handleRun = async () => {
+    // Wrap handleRun in useCallback to use it in useEffect
+    const handleRun = useCallback(async () => {
+        console.log('Run function called via F4');
         if (!sourceCode.trim()) {
             setOutput('Error: Source code is empty.');
             setTargetCode('');
@@ -159,7 +161,35 @@ export default function IDEPage() {
             setTargetCode('Development mode - no compilation');
             setIsRunning(false);
         }
-    };
+    }, [sourceCode]);
+
+    // Add keyboard shortcut for F4 key - IMPROVED VERSION
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            console.log('Key pressed:', e.key, 'Code:', e.code, 'KeyCode:', e.keyCode);
+
+            // Check for F4 key press using multiple methods
+            if (e.key === 'F4' || e.code === 'F4' || e.keyCode === 115) {
+                e.preventDefault(); // Prevent default browser behavior
+                e.stopPropagation(); // Stop event bubbling
+
+                console.log('F4 detected, isRunning:', isRunning);
+
+                if (!isRunning) {
+                    console.log('Calling handleRun via F4');
+                    handleRun();
+                }
+            }
+        };
+
+        // Add event listener with capture phase
+        window.addEventListener('keydown', handleKeyDown, true);
+
+        // Clean up event listener on component unmount
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown, true);
+        };
+    }, [handleRun, isRunning]); // Dependencies: handleRun and isRunning
 
     const handleClearOutput = () => {
         setOutput('');
