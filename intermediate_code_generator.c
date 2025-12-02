@@ -180,11 +180,31 @@ static void generateCode(ASTNode *node)
         case NODE_STATEMENT:
             if (!node->left) break;
 
-            // If the statement is a declaration, generate it
+            // Declaration
             if (node->left->type == NODE_DECLARATION)
                 generateDeclarationList(node->left);
+
+            // Print statement
+            else if (node->value && strcmp(node->value, "PRINT_STMT") == 0)
+            {
+                ASTNode *print_node = node->left; // NODE_PRINTING
+                if (print_node && print_node->type == NODE_PRINTING)
+                {
+                    ASTNode *plist = print_node->left; // first PRINT_ITEM
+                    while (plist)
+                    {
+                        if (plist->type == NODE_PRINT_ITEM && plist->left)
+                        {
+                            generateExpression(plist->left, 1);
+                        }
+                        plist = plist->right;
+                    }
+                }
+            }
+
+            // Normal expression / assignment
             else
-                generateExpression(node->left, 0);  // normal expression/assignment
+                generateExpression(node->left, 1);
             break;
 
         case NODE_DECLARATION:
@@ -210,43 +230,59 @@ static void generateCode(ASTNode *node)
 // === Optimization ===
 static void removeRedundantTemporaries()
 {
-    if (codeCount==0){ optimizedCode=NULL; optimizedCount=0; return; }
-    optimizedCode = malloc(sizeof(TACInstruction)*codeCount);
-    if (!optimizedCode){ fprintf(stderr,"Out of memory\n"); exit(1); }
+    if (codeCount == 0) { optimizedCode = NULL; optimizedCount = 0; return; }
 
-    int j=0;
-    for(int i=0;i<codeCount;i++)
+    optimizedCode = malloc(sizeof(TACInstruction) * codeCount);
+    if (!optimizedCode) { fprintf(stderr, "Out of memory\n"); exit(1); }
+
+    int j = 0;
+
+    for (int i = 0; i < codeCount; i++)
     {
-        TACInstruction *cur=&code[i];
-        int inlined=0;
+        TACInstruction *cur = &code[i];
 
         // Only consider temp assignments
-        if (strncmp(cur->result,"temp",4)==0)
+        if (strncmp(cur->result, "temp", 4) == 0)
         {
-            // Look ahead for single-use assignment of this temp
-            for(int k=i+1;k<codeCount;k++)
+            int usageCount = 0;
+            int lastUseIndex = -1;
+
+            // Count how many times this temp is used
+            for (int k = 0; k < codeCount; k++)
             {
-                TACInstruction *next=&code[k];
-
-                // Pattern: next->arg1 uses tempX, and next is simple assignment
-                if (strcmp(next->arg1,cur->result)==0 && strcmp(next->op,"=")==0)
+                if (strcmp(code[k].arg1, cur->result) == 0 ||
+                    strcmp(code[k].arg2, cur->result) == 0)
                 {
-                    // Replace next instruction: target = original temp expression
-                    snprintf(optimizedCode[j].result,sizeof(optimizedCode[j].result),"%s",next->result);
-                    snprintf(optimizedCode[j].arg1,sizeof(optimizedCode[j].arg1),"%s",cur->arg1);
-                    snprintf(optimizedCode[j].op,sizeof(optimizedCode[j].op),"%s",cur->op);
-                    snprintf(optimizedCode[j].arg2,sizeof(optimizedCode[j].arg2),"%s",cur->arg2);
-
-                    j++; inlined=1; i=k; // skip temp and next assignment
-                    break;
+                    usageCount++;
+                    lastUseIndex = k;
                 }
+            }
+
+            if (usageCount == 0)
+            {
+                // Hanging temp: never used -> skip
+                continue;
+            }
+            else if (usageCount == 1 && lastUseIndex > i)
+            {
+                // Inline temp into its single usage
+                TACInstruction *next = &code[lastUseIndex];
+
+                if (strcmp(next->arg1, cur->result) == 0) 
+                    snprintf(next->arg1, sizeof(next->arg1), "%s", cur->arg1);
+                if (strcmp(next->arg2, cur->result) == 0) 
+                    snprintf(next->arg2, sizeof(next->arg2), "%s", cur->arg2);
+
+                // Skip this temp assignment
+                continue;
             }
         }
 
-        if(!inlined)
-            optimizedCode[j++] = *cur;
+        // Keep instruction
+        optimizedCode[j++] = *cur;
     }
-    optimizedCount=j;
+
+    optimizedCount = j;
 }
 
 // === Display ===
