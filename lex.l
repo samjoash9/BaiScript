@@ -53,7 +53,7 @@ extern void yyerror(const char *s);
 
 
 [0-9]+                { yylval.str = strdup(yytext); printf("[LEX] INT_LITERAL (%s)\n", yytext); return INT_LITERAL; }
-\'[^\']\'             { yylval.str = strdup(yytext); printf("[LEX] CHAR_LITERAL (%s)\n", yytext); return CHAR_LITERAL; }
+\'([^\\']|\\.)\'             { yylval.str = strdup(yytext); printf("[LEX] CHAR_LITERAL (%s)\n", yytext); return CHAR_LITERAL; }
 \"[^\"]*\"             { yylval.str = strdup(yytext); printf("[LEX] STRING_LITERAL (%s)\n", yytext); return STRING_LITERAL; }
 
 

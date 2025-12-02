@@ -297,6 +297,8 @@ static int try_parse_char_literal(const char *lex, long *out)
         case 't':
             *out = '\t';
             return 1;
+        case 'r': // no proper logic yet
+            *out = '\r';
         case '0':
             *out = '\0';
             return 1;
@@ -730,6 +732,7 @@ static void unescape_string(const char *src, char *dst, size_t dstsize)
             {
                 case 'n': dst[j++] = '\n'; break;
                 case 't': dst[j++] = '\t'; break;
+                case 'r': dst[j++] = '\r'; break;
                 case '0': dst[j++] = '\0'; break;
                 case '\\': dst[j++] = '\\'; break;
                 case '"': dst[j++] = '"'; break;
