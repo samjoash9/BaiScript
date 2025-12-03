@@ -8,3 +8,7 @@ output_tac.txt
 parser.exe
 node_modules/
 input.txt
+build/
+BaiScript/
+dist/
+release/

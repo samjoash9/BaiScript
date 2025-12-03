@@ -1,4 +1,6 @@
-KUAN newline = '\n'!
-KUAN a = 1, b = 2, c = 3!
+ENTEGER a = 1!
 
-PRENT a, newline, b, newline, c!
+ENTEGER b = 2!
+
+
+POQFPOQWG 
