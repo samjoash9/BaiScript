@@ -1,1 +1,4 @@
-KUAN a = '\n'!
+KUAN newline = '\n'!
+KUAN a = 1, b = 2, c = 3!
+
+PRENT a, newline, b, newline, c!
