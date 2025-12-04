@@ -91,3 +91,73 @@
              | <int_literal>
              | <char_literal>
              | "(" <simple_expr> ")"
+
+
+<identifier> ::= <ident_start> <ident_continue_seq>
+
+<ident_start> ::= "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J"
+                 | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R" | "S" | "T"
+                 | "U" | "V" | "W" | "X" | "Y" | "Z"
+                 | "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j"
+                 | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t"
+                 | "u" | "v" | "w" | "x" | "y" | "z"
+                 | "_"
+
+<ident_continue_seq> ::= <ident_continue> <ident_continue_seq>
+                        | ε
+
+<ident_continue> ::= <ident_start>
+                    | "0" | "1" | "2" | "3" | "4"
+                    | "5" | "6" | "7" | "8" | "9"
+
+
+<int_literal> ::= <digit> <digit_seq>
+
+<digit_seq> ::= <digit> <digit_seq>
+               | ε
+
+<digit> ::= "0" | "1" | "2" | "3" | "4"
+          | "5" | "6" | "7" | "8" | "9"
+
+
+<char_literal> ::= "'" <char_item> "'"
+
+<char_item> ::= <printable>
+               | <escape_sequence>
+
+
+<string_literal> ::= "\"" <string_char_seq> "\"" <- is just  { " <string_char_seq> " }
+
+<string_char_seq> ::= <string_char> <string_char_seq>
+                    | ε
+
+<string_char> ::= <printable>
+                 | <escape_sequence>
+
+
+<escape_sequence> ::= "\n"
+                    | "\t"
+                    | "\r"
+                    | "\\"
+                    | "\'"
+                    | "\""
+                    | "\0"
+
+<printable> ::= " " | "!" | "\"" | "#" | "$" | "%" | "&"
+                | "'" 
+                | "(" | ")" | "*" | "+" | "," | "-" | "." | "/"
+                | "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7"
+                | "8" | "9"
+                | ":" | ";" | "<" | "=" | ">" | "?"
+                | "@"
+                | "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H"
+                | "I" | "J" | "K" | "L" | "M" | "N" | "O" | "P"
+                | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X"
+                | "Y" | "Z"
+                | "[" | "\\" | "]" | "^" | "_" | "`"
+                | "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h"
+                | "i" | "j" | "k" | "l" | "m" | "n" | "o" | "p"
+                | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x"
+                | "y" | "z"
+                | "{" | "|" | "}" | "~"
+
