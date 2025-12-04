@@ -1,3 +1,6 @@
-CHAROT a = '\r'!
+ENTEGER a = 1!
 
-PRENT "hehe\r123"!
+ENTEGER b = 2!
+
+
+POQFPOQWG 

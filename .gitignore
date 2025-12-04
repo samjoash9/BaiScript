@@ -11,3 +11,7 @@ BaiScript CFG.pdf
 BaiScript CFG.docx
 main.exe
 input.txt
+build/
+BaiScript/
+dist/
+release/

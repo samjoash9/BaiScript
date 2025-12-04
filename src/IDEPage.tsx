@@ -3,7 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { CodeEditor } from './components/CodeEditor';
 import { Toolbar } from './components/Toolbar';
 import { WindowControls } from './components/WindowControls';
-import { Play, Code2, Sun, Moon } from 'lucide-react';
+import { Play, Sun, Moon } from 'lucide-react';
+
+// Import as URL string (simplest approach)
+import baiScriptLogoUrl from './BaiScriptLogo.svg';
 
 // Define the machine code type
 interface MachineCodeValue {
@@ -264,8 +267,13 @@ export default function IDEPage() {
                 style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
                 <div className="flex items-center justify-between px-6 py-4">
                     <div className="flex items-center gap-3">
-                        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-linear-to-br from-gray-800 to-gray-900 shadow-md">
-                            <Code2 className="w-6 h-6 text-white" />
+                        <div className="flex items-center justify-center w-10 h-10">
+                            {/* Use the imported URL in an img tag */}
+                            <img
+                                src={baiScriptLogoUrl}
+                                alt="BaiScript Logo"
+                                className="w-8 h-8"
+                            />
                         </div>
                         <div>
                             <h1 className={`text-xl font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>BaiScript IDE</h1>

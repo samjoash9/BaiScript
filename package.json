@@ -3,10 +3,15 @@
       "version": "0.1.0",
       "private": true,
       "main": "electron/main.js",
+      "description": "BaiScript IDE - Multi-stage Compiler Environment",
+      "author": "Your Name <your.email@example.com>",
+      "homepage": ".",
       "scripts": {
-            "dev": "concurrently \"vite\" \"electron .\"",
+            "dev": "concurrently -k \"vite\" \"electron .\"",
             "build": "vite build && electron-builder",
-            "electron:dev": "electron ."
+            "preview": "vite preview",
+            "electron:dev": "electron .",
+            "postinstall": "electron-builder install-app-deps"
       },
       "dependencies": {
             "@codemirror/lang-javascript": "^6.2.4",
@@ -41,6 +46,7 @@
             "@tailwindcss/vite": "^4.1.17",
             "@uiw/codemirror-themes": "^4.25.3",
             "@uiw/react-codemirror": "^4.25.3",
+            "canvas": "^3.2.0",
             "class-variance-authority": "^0.7.1",
             "clsx": "*",
             "cmdk": "^1.1.1",
@@ -60,6 +66,7 @@
             "vaul": "^1.1.2"
       },
       "devDependencies": {
+            "@svgr/webpack": "^8.1.0",
             "@types/node": "^20.10.0",
             "@types/react": "^19.2.6",
             "@types/react-dom": "^19.2.3",
@@ -70,40 +77,58 @@
             "electron-builder": "^25.1.8",
             "postcss": "^8.5.6",
             "tailwindcss": "^4.1.17",
+            "typescript": "^5.3.3",
             "vite": "6.3.5",
             "vite-plugin-electron": "^0.28.0"
       },
       "build": {
-            "appId": "com.baiscript.id",
+            "appId": "com.baiscript.ide",
             "productName": "BaiScript IDE",
             "directories": {
-                  "output": "BaiScript"
+                  "output": "release",
+                  "buildResources": "electron"
             },
             "files": [
-                  "build/**/*",
+                  "dist/**/*",
                   "electron/**/*",
-                  "package.json"
+                  "!electron/**/*.map",
+                  "!electron/node_modules",
+                  "!electron/icon.png",
+                  "!electron/icon.ico",
+                  "!electron/icon.icns"
             ],
             "extraResources": [
                   {
                         "from": "main.exe",
-                        "to": "main.exe",
-                        "filter": [
-                              "**/*"
-                        ]
+                        "to": "main.exe"
+                  },
+                  {
+                        "from": "electron/icon.ico",
+                        "to": "icon.ico"
+                  },
+                  {
+                        "from": "electron/icon.png",
+                        "to": "icon.png"
+                  },
+                  {
+                        "from": "electron/icon.icns",
+                        "to": "icon.icns"
                   }
             ],
             "win": {
-                  "target": "nsis"
+                  "target": "nsis",
+                  "icon": "electron/icon.ico"
             },
             "mac": {
-                  "target": "dmg"
+                  "target": "dmg",
+                  "icon": "electron/icon.icns"
             },
             "linux": {
                   "target": [
                         "AppImage",
                         "deb"
-                  ]
+                  ],
+                  "icon": "electron/icon.png"
             }
       }
 }
