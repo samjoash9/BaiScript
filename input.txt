@@ -1,6 +1,3 @@
 ENTEGER a = 1!
 
-ENTEGER b = 2!
-
-
-POQFPOQWG 
+a += a!
