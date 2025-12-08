@@ -565,7 +565,7 @@ static SEM_TEMP evaluate_expression(ASTNode *node)
                 snprintf(symbol_table[idx].value_str, SYMBOL_VALUE_MAX, "%ld", newval);
             }
 
-            SEM_TEMP r = sem_new_temp(SEM_TYPE_INT);
+            SEM_TEMP r = sem_new_temp(kv->temp.type);
             r.is_constant = 1;
             r.int_value = newval;
             r.node = node;
