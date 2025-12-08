@@ -412,10 +412,8 @@ static SEM_TEMP eval_term(ASTNode *node)
 
     if (!node->left || !node->right)
     {
-        if (node->left)
-            evaluate_expression(node->left);
-        if (node->right)
-            evaluate_expression(node->right);
+        if (node->left)  evaluate_expression(node->left);
+        if (node->right) evaluate_expression(node->right);
         return sem_new_temp(SEM_TYPE_UNKNOWN);
     }
 
@@ -423,9 +421,26 @@ static SEM_TEMP eval_term(ASTNode *node)
     SEM_TEMP R = eval_factor(node->right);
     const char *op = node->value ? node->value : "";
 
+    long val = 0;
+    SEM_TYPE result_type = SEM_TYPE_INT;
+
+    // -----------------------------
+    // TYPE RESOLUTION (same as additive)
+    // -----------------------------
+    if (L.type == SEM_TYPE_CHAR && R.type == SEM_TYPE_CHAR)
+        result_type = SEM_TYPE_CHAR;
+    else if (L.type == SEM_TYPE_CHAR && R.type == SEM_TYPE_INT)
+        result_type = SEM_TYPE_CHAR;
+    else if (L.type == SEM_TYPE_INT && R.type == SEM_TYPE_CHAR)
+        result_type = SEM_TYPE_INT;
+    else
+        result_type = SEM_TYPE_INT;
+
+    // -----------------------------
+    // CONSTANT FOLDING (if possible)
+    // -----------------------------
     if (L.is_constant && R.is_constant && op[0] != '\0')
     {
-        long val = 0;
         if (strcmp(op, "*") == 0)
         {
             val = L.int_value * R.int_value;
@@ -435,30 +450,25 @@ static SEM_TEMP eval_term(ASTNode *node)
             if (R.int_value == 0)
             {
                 sem_record_error(node, "Division by zero");
-                val = 0; // fallback
+                val = 0;
             }
             else
             {
                 val = L.int_value / R.int_value;
             }
         }
-        else
-        {
-            goto no_fold_term;
-        }
-        SEM_TEMP t = sem_new_temp(SEM_TYPE_INT);
-        t.is_constant = 1;
-        t.int_value = val;
-        t.node = node;
-        return t;
     }
 
-no_fold_term:
-{
-    SEM_TEMP res = sem_new_temp(SEM_TYPE_INT);
-    res.node = node;
-    return res;
-}
+    // -----------------------------
+    // RESULT TEMP
+    // -----------------------------
+    SEM_TEMP t = sem_new_temp(result_type);
+    t.node = node;
+    t.is_constant = (L.is_constant && R.is_constant);
+    t.int_value = val;
+    t.type = result_type;
+
+    return t;
 }
 
 static SEM_TEMP eval_additive(ASTNode *node)
