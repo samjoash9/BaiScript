@@ -1,8 +1,3 @@
-<<<<<<< HEAD
-ENTEGER a = '1'!
-a =  ++a + a++!
-=======
-ENTEGER b = 10 + 2 * (8 / 2)!
-
-PRENT b!
->>>>>>> 8b1d1c7bdc06f09ec0ac3fe2d332abe09ca9fb6a
+ENTEGER a = 1!
+a += a++ + ++a!
+PRENT a!

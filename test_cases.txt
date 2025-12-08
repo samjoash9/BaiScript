@@ -47,3 +47,8 @@ CHAROT a = '1'!
 a++!
 PRENT a!
 PRENT ++a!
+
+// NOT FIXED (skip)
+1, 2, 3!
+
+// NOT FIXED
