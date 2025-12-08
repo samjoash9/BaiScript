@@ -22,3 +22,15 @@ ENTEGER k = ++a + a++!
 ENTEGER l = (1 + 2) / (3 * 2)!
 
 KUAN m = 'a' + 2!
+
+// FIXED
+KUAN a = '1'!
+a++!
+PRENT a!
+PRENT ++a!
+
+// FIXED
+CHAROT a = '1'!
+a++!
+PRENT a!
+PRENT ++a!

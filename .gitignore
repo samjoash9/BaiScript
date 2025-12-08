@@ -15,3 +15,4 @@ build/
 BaiScript/
 dist/
 release/
+test.c
