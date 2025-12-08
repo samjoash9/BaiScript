@@ -49,6 +49,7 @@ export default function IDEPage() {
 
     const [notification, setNotification] = useState('');
 
+    // Apply theme to document
     useEffect(() => {
         const root = document.documentElement;
         if (theme === 'dark') root.classList.add('dark');
@@ -56,6 +57,7 @@ export default function IDEPage() {
         localStorage.setItem('theme', theme);
     }, [theme]);
 
+    // Persist state to localStorage
     useEffect(() => { localStorage.setItem('sourceCode', sourceCode); }, [sourceCode]);
     useEffect(() => { localStorage.setItem('output', output); }, [output]);
     useEffect(() => { localStorage.setItem('targetCode', targetCode); }, [targetCode]);
@@ -85,11 +87,11 @@ export default function IDEPage() {
 
     // Wrap handleRun in useCallback to use it in useEffect
     const handleRun = useCallback(async () => {
-        console.log('Run function called via F4');
-        if (!sourceCode.trim()) {
-            setOutput('Error: Source code is empty.');
-            setTargetCode('');
-            setMachineCode('');
+        console.log('Run function called');
+
+        // Only check if already running
+        if (isRunning) {
+            console.log('Already running, skipping');
             return;
         }
 
@@ -107,7 +109,6 @@ export default function IDEPage() {
 
                 if (isSuccess) {
                     // SUCCESS: Use structured machine code with tabs
-                    // For successful compilation, use the print output or stdout
                     const printOutput = result.outputs?.print || result.stdout || 'No output generated.';
                     setOutput(printOutput);
                     setTargetCode(result.outputs?.assembly || '');
@@ -124,7 +125,6 @@ export default function IDEPage() {
                     }
                 } else {
                     // COMPILATION ERROR: Use output_print.txt content for the Output panel
-                    // This is the key change - use the print output for errors
                     const errorOutput = result.outputs?.print ||
                         result.stderr ||
                         result.stdout ||
@@ -164,7 +164,7 @@ export default function IDEPage() {
             setTargetCode('Development mode - no compilation');
             setIsRunning(false);
         }
-    }, [sourceCode]);
+    }, [sourceCode, isRunning]); // Added isRunning as dependency
 
     // Add keyboard shortcut for F4 key - IMPROVED VERSION
     useEffect(() => {
@@ -178,6 +178,7 @@ export default function IDEPage() {
 
                 console.log('F4 detected, isRunning:', isRunning);
 
+                // Only check if already running
                 if (!isRunning) {
                     console.log('Calling handleRun via F4');
                     handleRun();
@@ -192,7 +193,7 @@ export default function IDEPage() {
         return () => {
             window.removeEventListener('keydown', handleKeyDown, true);
         };
-    }, [handleRun, isRunning]); // Dependencies: handleRun and isRunning
+    }, [handleRun, isRunning]); // Removed sourceCode dependency
 
     const handleClearOutput = () => {
         setOutput('');
@@ -286,7 +287,12 @@ export default function IDEPage() {
                         <button type="button" onClick={handleClearInput} className={`px-4 py-2 rounded-lg transition-all ${theme === 'dark' ? 'border border-gray-700 hover:border-gray-600 hover:bg-gray-800/50' : 'border border-gray-400 hover:border-gray-500 hover:bg-gray-100'}`}>Clear Input</button>
                         <button type="button" onClick={handleClearOutput} className={`px-4 py-2 rounded-lg transition-all ${theme === 'dark' ? 'border border-gray-700 hover:border-gray-600 hover:bg-gray-800/50' : 'border border-gray-400 hover:border-gray-500 hover:bg-gray-100'}`}>Clear Output</button>
                         <button type="button" onClick={() => navigate('/docs')} className={`px-4 py-2 rounded-lg transition-all ${theme === 'dark' ? 'border border-gray-700 hover:border-gray-600 hover:bg-gray-800/50' : 'border border-gray-400 hover:border-gray-500 hover:bg-gray-100'}`}>Docs</button>
-                        <button type="button" onClick={handleRun} disabled={isRunning} className={`flex items-center gap-2 px-6 py-2 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed ${theme === 'dark' ? 'bg-linear-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 text-white shadow-md hover:shadow-lg' : 'bg-linear-to-r from-slate-700 to-slate-900 hover:from-slate-800 hover:to-black text-white shadow-md hover:shadow-lg border border-gray-300'}`}>
+                        <button
+                            type="button"
+                            onClick={handleRun}
+                            disabled={isRunning}
+                            className={`flex items-center gap-2 px-6 py-2 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed ${theme === 'dark' ? 'bg-linear-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 text-white shadow-md hover:shadow-lg' : 'bg-linear-to-r from-slate-700 to-slate-900 hover:from-slate-800 hover:to-black text-white shadow-md hover:shadow-lg border border-gray-300'}`}
+                        >
                             <Play className="w-4 h-4" /> {isRunning ? 'Running...' : 'Run'}
                         </button>
                         <button type="button" onClick={toggleTheme} className={`p-2 rounded-lg border transition-all ${theme === 'dark' ? 'border-gray-700 hover:border-gray-600 hover:bg-gray-800/50' : 'border border-gray-300/70 hover:border-gray-400 hover:bg-gray-100'}`} title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
