@@ -1,6 +1,3 @@
-ENTEGER a = 1!
+ENTEGER b = 10 + 2 * (8 / 2)!
 
-ENTEGER b = 2!
-
-
-POQFPOQWG 
+PRENT b!

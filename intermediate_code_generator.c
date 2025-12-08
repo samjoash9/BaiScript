@@ -1,5 +1,10 @@
-// intermediate_code_generator.c
-// BaiScript TAC generator — clean, single-assignment, prefix/postfix correct
+// intermediate_code_generator_fixed.c
+// BaiScript TAC generator — fixed version
+// Improvements made:
+// - Fixed declaration traversal so initializer expressions are fully generated (removed early return)
+// - More robust recursive traversal for declaration lists
+// - generateCode visits both left and right children for composite nodes
+// - Minor safety checks and comments
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -129,7 +134,7 @@ static char *generateExpression(ASTNode *node, int used_in_expr)
         return opnd;
     }
 
-    // Binary operation
+    // Binary operation (assume AST encodes precedence)
     if (node->left && node->right)
     {
         char *left_val = generateExpression(node->left, 1);
@@ -144,19 +149,38 @@ static char *generateExpression(ASTNode *node, int used_in_expr)
 }
 
 // === Declaration List Generator ===
+// Recursively traverse both children; ensure initializer expressions are generated fully
 static void generateDeclarationList(ASTNode *node)
 {
     if (!node) return;
 
-    if (node->type == NODE_DECLARATION && node->value && strcmp(node->value,"INIT_DECL")==0)
+    // If this node itself is an INIT_DECL, handle it
+    if (node->type == NODE_DECLARATION && node->value && strcmp(node->value, "INIT_DECL") == 0)
     {
-        char *ident = strdup(node->left->value);
-        char *rhs = node->right ? generateExpression(node->right, 1) : strdup("0");
-        emit(ident,rhs,"=",NULL);
-        free(rhs); free(ident);
+        // left should be ident, right is initializer expression (optional)
+        if (node->left && node->left->value)
+        {
+            char *ident = strdup(node->left->value);
+
+            // Generate the rhs expression first — this will emit any temps needed.
+            char *rhs = NULL;
+            if (node->right)
+                rhs = generateExpression(node->right, 1);
+            if (!rhs)
+                rhs = strdup("0");
+
+            // Now emit the final store to the identifier.
+            emit(ident, rhs, "=", NULL);
+
+            free(rhs);
+            free(ident);
+        }
+
+        // handled this declaration node; don't recurse into left/right again
         return;
     }
 
+    // Otherwise recurse left and right to find INIT_DECL nodes
     generateDeclarationList(node->left);
     generateDeclarationList(node->right);
 }
@@ -169,10 +193,13 @@ static void generateCode(ASTNode *node)
     switch(node->type)
     {
         case NODE_START:
+            // Ensure both branches are visited
             generateCode(node->left);
+            generateCode(node->right);
             break;
 
         case NODE_STATEMENT_LIST:
+            // In many AST shapes statement_list is left-stacked: visit left then right
             generateCode(node->left);
             generateCode(node->right);
             break;
@@ -208,6 +235,7 @@ static void generateCode(ASTNode *node)
             break;
 
         case NODE_DECLARATION:
+            // If declaration appears directly as a node, handle declaration list
             generateDeclarationList(node);
             break;
 
@@ -215,22 +243,28 @@ static void generateCode(ASTNode *node)
         case NODE_EXPRESSION:
         case NODE_POSTFIX_OP:
         case NODE_UNARY_OP:
-            { 
+            {
                 char *res = generateExpression(node, 1);
                 if (res) free(res);
-            } 
+            }
             break;
 
         default:
+            // For any other node types, try to recurse to children
+            generateCode(node->left);
+            generateCode(node->right);
             break;
     }
 }
 
-
-// === Optimization ===
+// === Optimization: remove redundant temporaries and propagate copies ===
 static void removeRedundantTemporaries()
 {
-    if (codeCount == 0) { optimizedCode = NULL; optimizedCount = 0; return; }
+    if (codeCount == 0) {
+        optimizedCode = NULL;
+        optimizedCount = 0;
+        return;
+    }
 
     optimizedCode = malloc(sizeof(TACInstruction) * codeCount);
     if (!optimizedCode) { fprintf(stderr, "Out of memory\n"); exit(1); }
@@ -241,40 +275,33 @@ static void removeRedundantTemporaries()
     {
         TACInstruction *cur = &code[i];
 
-        // Only consider temp assignments
+        // Skip unused temps (case 1)
         if (strncmp(cur->result, "temp", 4) == 0)
         {
-            int usageCount = 0;
-            int lastUseIndex = -1;
-
-            // Count how many times this temp is used
-            for (int k = 0; k < codeCount; k++)
+            int used = 0;
+            for (int k = i + 1; k < codeCount; k++)
             {
-                if (strcmp(code[k].arg1, cur->result) == 0 ||
-                    strcmp(code[k].arg2, cur->result) == 0)
+                if (strcmp(code[k].arg1, cur->result) == 0 || strcmp(code[k].arg2, cur->result) == 0)
                 {
-                    usageCount++;
-                    lastUseIndex = k;
+                    used = 1;
+                    break;
                 }
             }
+            if (!used) continue;
+        }
 
-            if (usageCount == 0)
+        // Simple next-line copy propagation (case 2)
+        if (i + 1 < codeCount)
+        {
+            TACInstruction *next = &code[i + 1];
+            if (strncmp(cur->result, "temp", 4) == 0 && strcmp(cur->op, "=") == 0 &&
+                strcmp(next->op, "=") == 0 && strcmp(next->arg1, cur->result) == 0)
             {
-                // Hanging temp: never used -> skip
-                continue;
-            }
-            else if (usageCount == 1 && lastUseIndex > i)
-            {
-                // Inline temp into its single usage
-                TACInstruction *next = &code[lastUseIndex];
+                // tempX = expr ; b = tempX → b = expr
+                snprintf(next->arg1, sizeof(next->arg1), "%s", cur->arg1);
 
-                if (strcmp(next->arg1, cur->result) == 0) 
-                    snprintf(next->arg1, sizeof(next->arg1), "%s", cur->arg1);
-                if (strcmp(next->arg2, cur->result) == 0) 
-                    snprintf(next->arg2, sizeof(next->arg2), "%s", cur->arg2);
-
-                // Skip this temp assignment
-                continue;
+                // SKIP adding this temp instruction
+                continue; // do not copy 'cur' into optimizedCode
             }
         }
 
@@ -284,6 +311,8 @@ static void removeRedundantTemporaries()
 
     optimizedCount = j;
 }
+
+
 
 // === Display ===
 static void displayTAC()

@@ -22,3 +22,16 @@ ENTEGER k = ++a + a++!
 ENTEGER l = (1 + 2) / (3 * 2)!
 
 KUAN m = 'a' + 2!
+
+ENTEGER a, b = 0, c!
+
+KUAN d = '\n'!
+ENTEGER f = d!
+PRENT "hehehe", d, f!
+
+KUAN g = 0 + 'b' - 'c'!
+PRENT g!
+
+ENTEGER a = 10 + 2 * 4 / 8!
+ENTEGER b = 10 + 2 * (8 / 2)!
+PRENT a, " ", b!
