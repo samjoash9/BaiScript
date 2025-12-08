@@ -1,10 +1,8 @@
-ENTEGER x = 4, y = 7, z = 12, w = 3!
+<<<<<<< HEAD
+ENTEGER a = '1'!
+a =  ++a + a++!
+=======
+ENTEGER b = 10 + 2 * (8 / 2)!
 
-
-KUAN total = (
-    ((x * y) + (z / 2) - (x))  + (y * 3) 
-    - (w + x * 2) + ((z) * (y) / (x + 1))
-    - ((z * x) - (y / 3) + (w * 5))
-)! 
-
-PRENT "FINAL TOTAL: ", total!
+PRENT b!
+>>>>>>> 8b1d1c7bdc06f09ec0ac3fe2d332abe09ca9fb6a

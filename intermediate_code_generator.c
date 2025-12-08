@@ -1,10 +1,5 @@
-// intermediate_code_generator_fixed.c
-// BaiScript TAC generator — fixed version
-// Improvements made:
-// - Fixed declaration traversal so initializer expressions are fully generated (removed early return)
-// - More robust recursive traversal for declaration lists
-// - generateCode visits both left and right children for composite nodes
-// - Minor safety checks and comments
+// intermediate_code_generator.c
+// BaiScript TAC generator — clean, single-assignment, prefix/postfix correct
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -134,7 +129,7 @@ static char *generateExpression(ASTNode *node, int used_in_expr)
         return opnd;
     }
 
-    // Binary operation (assume AST encodes precedence)
+    // Binary operation
     if (node->left && node->right)
     {
         char *left_val = generateExpression(node->left, 1);
@@ -149,38 +144,19 @@ static char *generateExpression(ASTNode *node, int used_in_expr)
 }
 
 // === Declaration List Generator ===
-// Recursively traverse both children; ensure initializer expressions are generated fully
 static void generateDeclarationList(ASTNode *node)
 {
     if (!node) return;
 
-    // If this node itself is an INIT_DECL, handle it
-    if (node->type == NODE_DECLARATION && node->value && strcmp(node->value, "INIT_DECL") == 0)
+    if (node->type == NODE_DECLARATION && node->value && strcmp(node->value,"INIT_DECL")==0)
     {
-        // left should be ident, right is initializer expression (optional)
-        if (node->left && node->left->value)
-        {
-            char *ident = strdup(node->left->value);
-
-            // Generate the rhs expression first — this will emit any temps needed.
-            char *rhs = NULL;
-            if (node->right)
-                rhs = generateExpression(node->right, 1);
-            if (!rhs)
-                rhs = strdup("0");
-
-            // Now emit the final store to the identifier.
-            emit(ident, rhs, "=", NULL);
-
-            free(rhs);
-            free(ident);
-        }
-
-        // handled this declaration node; don't recurse into left/right again
+        char *ident = strdup(node->left->value);
+        char *rhs = node->right ? generateExpression(node->right, 1) : strdup("0");
+        emit(ident,rhs,"=",NULL);
+        free(rhs); free(ident);
         return;
     }
 
-    // Otherwise recurse left and right to find INIT_DECL nodes
     generateDeclarationList(node->left);
     generateDeclarationList(node->right);
 }
@@ -193,13 +169,10 @@ static void generateCode(ASTNode *node)
     switch(node->type)
     {
         case NODE_START:
-            // Ensure both branches are visited
             generateCode(node->left);
-            generateCode(node->right);
             break;
 
         case NODE_STATEMENT_LIST:
-            // In many AST shapes statement_list is left-stacked: visit left then right
             generateCode(node->left);
             generateCode(node->right);
             break;
@@ -207,35 +180,14 @@ static void generateCode(ASTNode *node)
         case NODE_STATEMENT:
             if (!node->left) break;
 
-            // Declaration
+            // If the statement is a declaration, generate it
             if (node->left->type == NODE_DECLARATION)
                 generateDeclarationList(node->left);
-
-            // Print statement
-            else if (node->value && strcmp(node->value, "PRINT_STMT") == 0)
-            {
-                ASTNode *print_node = node->left; // NODE_PRINTING
-                if (print_node && print_node->type == NODE_PRINTING)
-                {
-                    ASTNode *plist = print_node->left; // first PRINT_ITEM
-                    while (plist)
-                    {
-                        if (plist->type == NODE_PRINT_ITEM && plist->left)
-                        {
-                            generateExpression(plist->left, 1);
-                        }
-                        plist = plist->right;
-                    }
-                }
-            }
-
-            // Normal expression / assignment
             else
-                generateExpression(node->left, 1);
+                generateExpression(node->left, 0);  // normal expression/assignment
             break;
 
         case NODE_DECLARATION:
-            // If declaration appears directly as a node, handle declaration list
             generateDeclarationList(node);
             break;
 
@@ -243,76 +195,59 @@ static void generateCode(ASTNode *node)
         case NODE_EXPRESSION:
         case NODE_POSTFIX_OP:
         case NODE_UNARY_OP:
-            {
+            { 
                 char *res = generateExpression(node, 1);
                 if (res) free(res);
-            }
+            } 
             break;
 
         default:
-            // For any other node types, try to recurse to children
-            generateCode(node->left);
-            generateCode(node->right);
             break;
     }
 }
 
-// === Optimization: remove redundant temporaries and propagate copies ===
+
+// === Optimization ===
 static void removeRedundantTemporaries()
 {
-    if (codeCount == 0) {
-        optimizedCode = NULL;
-        optimizedCount = 0;
-        return;
-    }
+    if (codeCount==0){ optimizedCode=NULL; optimizedCount=0; return; }
+    optimizedCode = malloc(sizeof(TACInstruction)*codeCount);
+    if (!optimizedCode){ fprintf(stderr,"Out of memory\n"); exit(1); }
 
-    optimizedCode = malloc(sizeof(TACInstruction) * codeCount);
-    if (!optimizedCode) { fprintf(stderr, "Out of memory\n"); exit(1); }
-
-    int j = 0;
-
-    for (int i = 0; i < codeCount; i++)
+    int j=0;
+    for(int i=0;i<codeCount;i++)
     {
-        TACInstruction *cur = &code[i];
+        TACInstruction *cur=&code[i];
+        int inlined=0;
 
-        // Skip unused temps (case 1)
-        if (strncmp(cur->result, "temp", 4) == 0)
+        // Only consider temp assignments
+        if (strncmp(cur->result,"temp",4)==0)
         {
-            int used = 0;
-            for (int k = i + 1; k < codeCount; k++)
+            // Look ahead for single-use assignment of this temp
+            for(int k=i+1;k<codeCount;k++)
             {
-                if (strcmp(code[k].arg1, cur->result) == 0 || strcmp(code[k].arg2, cur->result) == 0)
+                TACInstruction *next=&code[k];
+
+                // Pattern: next->arg1 uses tempX, and next is simple assignment
+                if (strcmp(next->arg1,cur->result)==0 && strcmp(next->op,"=")==0)
                 {
-                    used = 1;
+                    // Replace next instruction: target = original temp expression
+                    snprintf(optimizedCode[j].result,sizeof(optimizedCode[j].result),"%s",next->result);
+                    snprintf(optimizedCode[j].arg1,sizeof(optimizedCode[j].arg1),"%s",cur->arg1);
+                    snprintf(optimizedCode[j].op,sizeof(optimizedCode[j].op),"%s",cur->op);
+                    snprintf(optimizedCode[j].arg2,sizeof(optimizedCode[j].arg2),"%s",cur->arg2);
+
+                    j++; inlined=1; i=k; // skip temp and next assignment
                     break;
                 }
             }
-            if (!used) continue;
         }
 
-        // Simple next-line copy propagation (case 2)
-        if (i + 1 < codeCount)
-        {
-            TACInstruction *next = &code[i + 1];
-            if (strncmp(cur->result, "temp", 4) == 0 && strcmp(cur->op, "=") == 0 &&
-                strcmp(next->op, "=") == 0 && strcmp(next->arg1, cur->result) == 0)
-            {
-                // tempX = expr ; b = tempX → b = expr
-                snprintf(next->arg1, sizeof(next->arg1), "%s", cur->arg1);
-
-                // SKIP adding this temp instruction
-                continue; // do not copy 'cur' into optimizedCode
-            }
-        }
-
-        // Keep instruction
-        optimizedCode[j++] = *cur;
+        if(!inlined)
+            optimizedCode[j++] = *cur;
     }
-
-    optimizedCount = j;
+    optimizedCount=j;
 }
-
-
 
 // === Display ===
 static void displayTAC()
