@@ -35,3 +35,15 @@ PRENT g!
 ENTEGER a = 10 + 2 * 4 / 8!
 ENTEGER b = 10 + 2 * (8 / 2)!
 PRENT a, " ", b!
+
+// FIXED
+KUAN a = '1'!
+a++!
+PRENT a!
+PRENT ++a!
+
+// FIXED
+CHAROT a = '1'!
+a++!
+PRENT a!
+PRENT ++a!
