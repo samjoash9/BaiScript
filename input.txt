@@ -1,3 +1,22 @@
-CHAROT a = '\n'!
+// VARIABLE AND DECLARATION
+ENTEGER a, b, c!
 
-PRENT a * 10!
+// ASSIGNMENT
+a = 1!
+b = 2!
+c = 3!
+// compound
+a += 1!
+b -= 1!
+c /= 3!
+
+// ARITHMETIC
+a = 10 + 2 * 4 / 8!
+
+// GENERAL PURPOSE
+KUAN d = 'd'!
+
+// PRINTING
+PRENT "a = ", a!
+PRENT "d = ", --d!
+
